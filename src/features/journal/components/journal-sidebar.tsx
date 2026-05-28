@@ -1,9 +1,10 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 
 import { JournalEntry } from '@/features/journal/hooks/use-journal-entries'
-import { DayPicker } from 'react-day-picker'
+import { ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { DayPicker, type DateRange } from 'react-day-picker'
 
 import { cn } from '@/lib/utils'
 
@@ -30,67 +31,167 @@ function formatChip(date: string, today: string): string {
   return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
 }
 
+function toDateKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 export function JournalSidebar({ entries, selectedDate, onSelect }: JournalSidebarProps) {
   const today = todayKey()
-
-  // Ensure "Today" appears first as a tappable chip even when no entry exists yet.
-  const list = useMemo(() => {
-    const dates = new Set(entries.map((e) => e.date))
-    const ordered: { date: string; entry: JournalEntry | null }[] = []
-    if (!dates.has(today)) ordered.push({ date: today, entry: null })
-    entries
-      .slice()
-      .sort((a, b) => (a.date < b.date ? 1 : -1))
-      .forEach((e) => ordered.push({ date: e.date, entry: e }))
-    return ordered
-  }, [entries, today])
+  const todayObj = useMemo(() => new Date(), [])
+  // The month currently shown in the calendar.
+  const [viewMonth, setViewMonth] = useState<Date>(() =>
+    selectedDate ? new Date(`${selectedDate}T00:00:00`) : new Date(),
+  )
+  // Optional date range to filter the entries list. When set, the list
+  // below the calendar shows only entries whose date falls within
+  // [range.from, range.to]. Click two days on the calendar to define;
+  // click Clear to reset.
+  const [range, setRange] = useState<DateRange | undefined>(undefined)
 
   const entryDates = useMemo(
     () => entries.map((e) => new Date(`${e.date}T00:00:00`)),
     [entries],
   )
 
+  // Highlight the current week (Sun-Sat) on the calendar so the user
+  // sees their journaling window at a glance.
+  const thisWeekDates = useMemo(() => {
+    const dow = todayObj.getDay()
+    const start = new Date(todayObj)
+    start.setDate(todayObj.getDate() - dow)
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(start)
+      d.setDate(start.getDate() + i)
+      return d
+    })
+  }, [todayObj])
+
+  // Entries filtered by the active range (if any), with Today pinned at top
+  // when no entry exists for it and no range is active.
+  const list = useMemo(() => {
+    const fromKey = range?.from ? toDateKey(range.from) : null
+    const toKey = range?.to ? toDateKey(range.to) : fromKey
+    const within = (date: string): boolean => {
+      if (!fromKey) return true
+      if (!toKey) return date === fromKey
+      return date >= fromKey && date <= toKey
+    }
+    const dates = new Set(entries.map((e) => e.date))
+    const ordered: { date: string; entry: JournalEntry | null }[] = []
+    if (!range && !dates.has(today)) ordered.push({ date: today, entry: null })
+    entries
+      .slice()
+      .filter((e) => within(e.date))
+      .sort((a, b) => (a.date < b.date ? 1 : -1))
+      .forEach((e) => ordered.push({ date: e.date, entry: e }))
+    return ordered
+  }, [entries, today, range])
+
+  const handleRangeChange = (next: DateRange | undefined) => {
+    setRange(next)
+    // When the user has picked a full range with a single entry inside,
+    // auto-open that entry so the editor follows the filter.
+    if (next?.from && next.to) {
+      const fromKey = toDateKey(next.from)
+      const toKey = toDateKey(next.to)
+      const hits = entries
+        .filter((e) => e.date >= fromKey && e.date <= toKey)
+        .sort((a, b) => (a.date < b.date ? 1 : -1))
+      if (hits.length > 0) onSelect(hits[0].date)
+    } else if (next?.from && !next.to) {
+      onSelect(toDateKey(next.from))
+    }
+  }
+
   const selectedDateObj = selectedDate ? new Date(`${selectedDate}T00:00:00`) : undefined
 
-  const handlePickDay = (day: Date | undefined) => {
-    if (!day) return
-    const key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`
-    onSelect(key)
+  const shiftMonth = (delta: number) => {
+    setViewMonth((prev) => {
+      const next = new Date(prev)
+      next.setMonth(prev.getMonth() + delta)
+      return next
+    })
   }
+
+  const monthLabel = viewMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
 
   return (
     <div className="space-y-3">
-      {/* Inline calendar pinned to the top — click any day to jump to it. */}
+      {/* Inline calendar pinned to the top with explicit month nav. */}
       <div className="rounded-lg border border-zinc-200 bg-white p-2">
+        <div className="mb-1 flex items-center justify-between gap-2 px-1">
+          <button
+            type="button"
+            onClick={() => shiftMonth(-1)}
+            aria-label="Previous month"
+            className="inline-flex h-6 w-6 items-center justify-center rounded text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </button>
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-700">
+            {monthLabel}
+          </span>
+          <button
+            type="button"
+            onClick={() => shiftMonth(1)}
+            aria-label="Next month"
+            className="inline-flex h-6 w-6 items-center justify-center rounded text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900"
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
         <DayPicker
-          mode="single"
-          selected={selectedDateObj}
-          onSelect={handlePickDay}
+          mode="range"
+          month={viewMonth}
+          onMonthChange={setViewMonth}
+          selected={range}
+          onSelect={handleRangeChange}
           disabled={{ after: new Date() }}
-          modifiers={{ hasEntry: entryDates }}
+          modifiers={{ hasEntry: entryDates, thisWeek: thisWeekDates }}
           modifiersClassNames={{
-            hasEntry: 'after:absolute after:bottom-0.5 after:left-1/2 after:h-1 after:w-1 after:-translate-x-1/2 after:rounded-full after:bg-[#f2cc0d] relative',
+            hasEntry:
+              'relative after:absolute after:bottom-0.5 after:left-1/2 after:h-1 after:w-1 after:-translate-x-1/2 after:rounded-full after:bg-[#f2cc0d]',
+            thisWeek: 'bg-[#fffbea]',
           }}
           showOutsideDays={false}
           classNames={{
             root: 'text-xs',
             months: 'flex flex-col',
-            month: 'space-y-1',
-            month_caption: 'flex justify-center font-semibold text-[11px] uppercase tracking-wider text-zinc-600',
-            nav: 'flex items-center justify-between absolute right-1 top-1 z-10',
-            button_previous: 'h-6 w-6 rounded hover:bg-zinc-100 inline-flex items-center justify-center text-zinc-500',
-            button_next: 'h-6 w-6 rounded hover:bg-zinc-100 inline-flex items-center justify-center text-zinc-500',
-            month_grid: 'w-full border-collapse mt-1',
+            month: 'space-y-0',
+            month_caption: 'hidden',
+            nav: 'hidden',
+            month_grid: 'w-full border-collapse',
             weekdays: 'flex',
-            weekday: 'flex-1 text-center text-[9px] font-semibold uppercase tracking-wider text-zinc-400 py-0.5',
+            weekday:
+              'flex-1 text-center text-[9px] font-semibold uppercase tracking-wider text-zinc-400 py-0.5',
             weeks: 'flex flex-col',
             week: 'flex w-full',
             day: 'flex-1 p-0 text-center',
-            day_button: 'h-6 w-full rounded text-[11px] font-medium text-zinc-700 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40',
+            day_button:
+              'h-7 w-full rounded text-[11px] font-medium text-zinc-700 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40',
             today: 'font-bold text-[#8a7307]',
-            selected: '[&_button]:!bg-[#f2cc0d] [&_button]:!text-zinc-900',
+            range_start: '[&_button]:!bg-[#f2cc0d] [&_button]:!text-zinc-900 rounded-l',
+            range_end: '[&_button]:!bg-[#f2cc0d] [&_button]:!text-zinc-900 rounded-r',
+            range_middle: 'bg-[#f2cc0d]/20',
           }}
         />
+        {range?.from && (
+          <div className="mt-1.5 flex items-center justify-between gap-2 border-t border-zinc-100 px-1 pt-1.5">
+            <span className="text-[10px] text-zinc-500">
+              {range.to
+                ? `${range.from.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} – ${range.to.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
+                : `From ${range.from.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`}
+            </span>
+            <button
+              type="button"
+              onClick={() => setRange(undefined)}
+              className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-medium text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700"
+            >
+              <X className="h-3 w-3" />
+              Clear
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="px-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">

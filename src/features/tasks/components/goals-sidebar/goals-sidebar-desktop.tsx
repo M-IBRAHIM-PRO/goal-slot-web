@@ -77,9 +77,9 @@ function SortableGoalItem({
         {isActiveNow && (
           <span
             className="rounded bg-emerald-100 px-1 py-[1px] text-[8px] font-bold uppercase tracking-wider text-emerald-700"
-            title="Has schedule blocks this week"
+            title="A schedule block linked to this goal is happening right now"
           >
-            On
+            On now
           </span>
         )}
         <button
