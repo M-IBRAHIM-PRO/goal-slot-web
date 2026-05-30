@@ -4,12 +4,8 @@ import { useCategoriesQuery } from '@/features/categories'
 import { useCreateTimeEntry } from '@/features/time-tracker/hooks/use-time-tracker-mutations'
 import { TaskSelector } from '@/features/time-tracker/components/task-selector'
 import { buildLocalDateFromParts, findScheduleBlockForDateTime } from '@/features/time-tracker/utils/schedule'
-import {
-  filterTasks,
-  getCategoryFromGoal,
-  getGoalIdFromCategory,
-  sortTasksBySelection,
-} from '@/features/time-tracker/utils/selection-helpers'
+
+import { getCategoryFromGoal, getGoalIdFromCategory, sortTasksBySelection } from '@/features/time-tracker/utils/selection-helpers'
 import { Goal, Task } from '@/features/time-tracker/utils/types'
 import { WeekSchedule } from '@/features/schedule/utils/types'
 import { useQueryClient } from '@tanstack/react-query'
@@ -49,10 +45,8 @@ export function ManualEntryModal({ isOpen, onClose, goals, tasks, weeklySchedule
   const createEntry = useCreateTimeEntry()
   const queryClient = useQueryClient()
   const { data: categories = [] } = useCategoriesQuery()
-  // Always show every task; sort puts the current goal/category matches at
-  // the top so they're easy to pick by default while leaving search/select of
-  // other tasks unconstrained.
-  const visibleTasks = sortTasksBySelection(tasks, goalId || undefined, category || undefined)
+
+  const orderedTasks = sortTasksBySelection(tasks, goalId || undefined, category || undefined)
 
   // Set default category when categories load
   useEffect(() => {
@@ -172,7 +166,7 @@ export function ManualEntryModal({ isOpen, onClose, goals, tasks, weeklySchedule
 
         <form id="manual-entry-form" onSubmit={handleSubmit} className="space-y-3">
           <TaskSelector
-            tasks={visibleTasks}
+            tasks={orderedTasks}
             currentTaskId={taskId}
             currentTask={title}
             timerState="STOPPED"
