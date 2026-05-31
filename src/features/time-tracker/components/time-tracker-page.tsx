@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
 
+import { useEffect, useMemo, useState } from 'react'
+
+import { useSearchParams } from 'next/navigation'
 import { useCategoriesQuery } from '@/features/categories'
 import { ManualEntryModal } from '@/features/time-tracker/components/manual-entry-modal'
 import { RecentEntries } from '@/features/time-tracker/components/recent-entries'
@@ -206,15 +207,17 @@ export function TimeTrackerPage() {
     }
   }
 
-  const orderedTasks = sortTasksBySelection(tasks, currentGoalId || undefined, currentCategory || undefined)
 
-  const filteredGoals = goals.filter((goal: Goal) => {
-    if (currentCategory) {
-      return goal.category === currentCategory
-    }
-    return true
-  })
+  // Sort tasks - prioritize tasks matching current goal/category but show all tasks
+  const orderedTasks = useMemo(
+    () => sortTasksBySelection(tasks, currentGoalId || undefined, currentCategory || undefined),
+    [tasks, currentGoalId, currentCategory],
+  )
 
+  const filteredGoals = useMemo(
+    () => goals.filter((goal: Goal) => (currentCategory ? goal.category === currentCategory : true)),
+    [goals, currentCategory],
+  )
 
   const startTimer = () => {
     const selectedTask = currentTaskId ? tasks.find((t: Task) => t.id === currentTaskId) : undefined

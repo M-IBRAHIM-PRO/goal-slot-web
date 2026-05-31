@@ -1,11 +1,12 @@
 import { fetchGoals, fetchGoalStats, goalQueries } from '@/features/goals/utils/queries'
 import { Goal, GoalFilters, GoalStats } from '@/features/goals/utils/types'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, type UseQueryOptions } from '@tanstack/react-query'
 
-export function useGoalsQuery(filters?: GoalFilters) {
+export function useGoalsQuery(filters?: GoalFilters, options?: UseQueryOptions<Goal[]>) {
   return useQuery<Goal[]>({
     queryKey: goalQueries.list(filters),
     queryFn: () => fetchGoals(filters),
+    ...options,
   })
 }
 
