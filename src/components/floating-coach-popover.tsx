@@ -196,6 +196,10 @@ export function FloatingCoachPopover({ open, onClose }: FloatingCoachPopoverProp
         } else {
           // Refetch persisted history so the streaming reply gets a real id.
           await queryClient.invalidateQueries({ queryKey: ['coach', 'chat', scopeKey] })
+          // Refresh the shared free-tier meter so the "N of 20 left today"
+          // badge in the Coach page header reflects this message without
+          // needing a manual reload.
+          await queryClient.invalidateQueries({ queryKey: ['coach', 'byok-key'] })
           setOptimistic([])
         }
       } catch (err) {

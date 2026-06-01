@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 
 import { CompleteTaskModal } from '@/features/tasks/components/complete-task-modal'
 import { CreateTaskModal } from '@/features/tasks/components/create-task-modal'
@@ -32,6 +33,10 @@ import { useLocalStorage } from '@/hooks/use-local-storage'
 
 export function TasksPage() {
   const { tasks, scheduleBlocks, goals, isLoading, goalStatus, setGoalStatus } = useTasks()
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const focusedTaskId = searchParams?.get('taskId') ?? null
 
   const createTaskMutation = useCreateTaskMutation()
   const updateTaskMutation = useUpdateTaskMutation()
@@ -124,6 +129,28 @@ export function TasksPage() {
       goalNextBlockMinutes: nextMins,
     }
   }, [scheduleBlocks])
+
+  // Deep-link support for ?taskId=<id>. When a user clicks the task name
+  // in the top bar timer or in a recent time entry, we land here. Find the
+  // task, switch the goals sidebar to its goal (so the row is visible),
+  // open the edit modal, then strip the query param so a refresh doesn't
+  // re-open the modal.
+  useEffect(() => {
+    if (!focusedTaskId || isLoading) return
+    const task = tasks.find((t) => t.id === focusedTaskId)
+    if (!task) {
+      // Tasks haven't streamed in yet, or the task was deleted. Wait one
+      // more render; if tasks are loaded and we still can't find it, drop
+      // the param so the URL doesn't stay stuck.
+      if (tasks.length > 0) {
+        router.replace(pathname || '/dashboard/tasks', { scroll: false })
+      }
+      return
+    }
+    setSelectedGoalId(task.goalId ?? WITHOUT_GOALS_ID)
+    setEditingTask(task)
+    router.replace(pathname || '/dashboard/tasks', { scroll: false })
+  }, [focusedTaskId, tasks, isLoading, router, pathname, setSelectedGoalId])
 
   // Auto-select first goal when goals change
   useEffect(() => {

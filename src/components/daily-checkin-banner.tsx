@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { useFloatingUiStore } from '@/lib/use-floating-ui-store'
 
 /**
  * Floating daily check-in teaser. Sits top-right on every dashboard page
@@ -33,6 +34,7 @@ import { Textarea } from '@/components/ui/textarea'
  */
 export function DailyCheckinBanner() {
   const { todayCheckin, submit } = useDailyCheckin()
+  const startTrackingOpen = useFloatingUiStore((s) => s.startTrackingOpen)
   const [open, setOpen] = useState(false)
   const [mood, setMood] = useState<number | null>(null)
   const [energy, setEnergy] = useState<number | null>(null)
@@ -80,6 +82,13 @@ export function DailyCheckinBanner() {
   // DailyCheckinCard, so there's no loss of affordance.
   if (todayCheckin) return null
 
+  // Step out of the way when the Start tracking popover owns the
+  // bottom-right corner. The popover sits at the same anchor (bottom-20
+  // right-4) and the pill was visually covering the popover's Start
+  // button. Keep the dialog mounted so an in-flight check-in submission
+  // is never interrupted by the popover opening.
+  const teaserHidden = startTrackingOpen
+
   return (
     <>
       {/*
@@ -93,9 +102,11 @@ export function DailyCheckinBanner() {
       */}
       <motion.div
         initial={{ x: 60, opacity: 0 }}
-        animate={{ x: 0, opacity: 1 }}
+        animate={{ x: teaserHidden ? 80 : 0, opacity: teaserHidden ? 0 : 1 }}
         transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1], delay: 0.15 }}
         className="group fixed bottom-20 right-4 z-30 sm:right-6"
+        style={{ pointerEvents: teaserHidden ? 'none' : 'auto' }}
+        aria-hidden={teaserHidden}
       >
         <button
           type="button"

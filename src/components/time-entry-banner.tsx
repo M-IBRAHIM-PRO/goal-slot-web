@@ -156,14 +156,24 @@ export function TimeEntryBanner() {
     <div className="sticky top-0 z-30 border-b border-yellow-400/20 bg-yellow-400/10">
       <div className="flex flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
         <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white border border-yellow-400/30 timer-glow">
+          <div className="timer-glow flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-yellow-400/30 bg-white">
             {isPaused ? <Pause className="h-5 w-5" /> : <Timer className="h-5 w-5" />}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-bold tracking-wider uppercase text-yellow-700">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-yellow-700">
               {isPaused ? 'Time entry paused' : 'Time entry in progress'}
             </p>
-            <p className="line-clamp-1 text-sm font-bold sm:text-base md:text-lg">{currentTask || 'Untitled Task'}</p>
+            {currentTaskId ? (
+              <Link
+                href={`/dashboard/tasks?taskId=${currentTaskId}`}
+                title="Open this task"
+                className="line-clamp-1 inline-block text-sm font-bold underline-offset-2 hover:text-yellow-800 hover:underline sm:text-base md:text-lg"
+              >
+                {currentTask || 'Untitled Task'}
+              </Link>
+            ) : (
+              <p className="line-clamp-1 text-sm font-bold sm:text-base md:text-lg">{currentTask || 'Untitled Task'}</p>
+            )}
           </div>
         </div>
 

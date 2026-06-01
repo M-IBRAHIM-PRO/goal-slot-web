@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import Link from 'next/link'
 
 import { EditTimeEntryModal } from '@/features/time-tracker/components/edit-time-entry-modal'
 import { useDeleteTimeEntry } from '@/features/time-tracker/hooks/use-time-tracker-mutations'
@@ -99,7 +100,7 @@ export function RecentEntries() {
         </div>
         <button
           type="button"
-          className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-200 bg-white text-zinc-900 text-sm font-semibold px-4 py-2 transition-colors hover:bg-zinc-50 disabled:opacity-50 px-3 py-1 text-xs"
+          className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 px-4 py-1 py-2 text-sm text-xs font-semibold text-zinc-900 transition-colors hover:bg-zinc-50 disabled:opacity-50"
           onClick={() => {
             setStartDate('')
             setEndDate('')
@@ -127,7 +128,7 @@ export function RecentEntries() {
           {hasFilters && (
             <button
               type="button"
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-zinc-900 text-white text-sm font-semibold px-4 py-2 transition-colors hover:bg-zinc-800 disabled:opacity-50 mt-4 px-4 py-2 text-xs"
+              className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm text-xs font-semibold text-white transition-colors hover:bg-zinc-800 disabled:opacity-50"
               onClick={() => {
                 setStartDate('')
                 setEndDate('')
@@ -152,7 +153,7 @@ export function RecentEntries() {
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-200 bg-white text-zinc-900 text-sm font-semibold px-4 py-2 transition-colors hover:bg-zinc-50 disabled:opacity-50 px-3 py-1 text-xs"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 px-4 py-1 py-2 text-sm text-xs font-semibold text-zinc-900 transition-colors hover:bg-zinc-50 disabled:opacity-50"
                 onClick={() => handlePageChange('prev')}
                 disabled={page === 1 || recentQuery.isFetching}
               >
@@ -160,7 +161,7 @@ export function RecentEntries() {
               </button>
               <button
                 type="button"
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-200 bg-white text-zinc-900 text-sm font-semibold px-4 py-2 transition-colors hover:bg-zinc-50 disabled:opacity-50 px-3 py-1 text-xs"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 px-4 py-1 py-2 text-sm text-xs font-semibold text-zinc-900 transition-colors hover:bg-zinc-50 disabled:opacity-50"
                 onClick={() => handlePageChange('next')}
                 disabled={!hasNext || recentQuery.isFetching}
               >
@@ -198,7 +199,17 @@ export function RecentEntries() {
                 style={{ backgroundColor: entry.goal?.color || '#f2cc0d' }}
               />
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-bold sm:text-base">{entry.taskName}</div>
+                {entry.taskId ? (
+                  <Link
+                    href={`/dashboard/tasks?taskId=${entry.taskId}`}
+                    title={`Open task "${entry.taskName}"`}
+                    className="block truncate text-sm font-bold underline-offset-2 hover:text-[#8a7307] hover:underline sm:text-base"
+                  >
+                    {entry.taskName}
+                  </Link>
+                ) : (
+                  <div className="truncate text-sm font-bold sm:text-base">{entry.taskName}</div>
+                )}
                 <div className="flex flex-wrap items-center gap-1.5 font-mono text-xs text-gray-500">
                   {entry.goal && (
                     <>

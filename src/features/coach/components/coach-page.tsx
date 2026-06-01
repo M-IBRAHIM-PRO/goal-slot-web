@@ -606,6 +606,10 @@ function ChatSection({ scopeKey }: ChatSectionProps) {
         } else {
           // Invalidate history so we get authoritative IDs/timestamps; drop optimistic.
           await queryClient.invalidateQueries({ queryKey: ['coach', 'chat', scopeKey] })
+          // Also refresh the shared free-tier meter so the "N of 20 left
+          // today" badge reflects this message. Previously the user had
+          // to reload the page to see the counter tick down.
+          await queryClient.invalidateQueries({ queryKey: ['coach', 'byok-key'] })
           setOptimistic([])
         }
       } catch (err) {

@@ -291,7 +291,7 @@ export function CommandPalette({
       icon: CheckSquare,
       group: 'Tasks',
       keywords: `${t.goal?.title ?? ''} ${t.category ?? ''}`,
-      href: `/dashboard/tasks?task=${encodeURIComponent(t.id)}`,
+      href: `/dashboard/tasks?taskId=${encodeURIComponent(t.id)}`,
     }))
 
     return [...quick, ...PAGE_ITEMS, ...(isAdmin ? ADMIN_ITEMS : []), ...goalItems, ...taskItems]

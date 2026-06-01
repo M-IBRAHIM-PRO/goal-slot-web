@@ -3,48 +3,63 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import { useTimerStore } from '@/lib/use-timer-store'
-import { Loader2, Play, Search, X } from 'lucide-react'
+import { Loader2, Play, Search, X, Plus } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 
 import { useTimeTrackerData } from '@/features/time-tracker/hooks/use-time-tracker-queries'
 import { findScheduleBlockForDateTime } from '@/features/time-tracker/utils/schedule'
 import type { Task } from '@/features/time-tracker/utils/types'
+import { useCreateTaskMutation } from '@/features/tasks/hooks/use-tasks-mutations'
 import { useDismissable } from '@/lib/use-dismissable'
+import { useFloatingUiStore } from '@/lib/use-floating-ui-store'
 
 interface StartTrackingPopoverProps {
   open: boolean
   onClose: () => void
 }
 
-/**
- * Bottom-right anchored popover that lets users start a timer from any
- * dashboard page without leaving where they are. Pre-fills the active
- * schedule block's task/goal/category as defaults; user can search/select
- * any task or type a free-form title.
- */
+const NO_GOAL = '__NO_GOAL__'
+
 export function StartTrackingPopover({ open, onClose }: StartTrackingPopoverProps) {
-  const { tasks, weeklySchedule } = useTimeTrackerData()
+  const { tasks, weeklySchedule, goals } = useTimeTrackerData()
   const start = useTimerStore((s) => s.start)
+  const createTaskMutation = useCreateTaskMutation()
+  const setStartTrackingOpen = useFloatingUiStore((s) => s.setStartTrackingOpen)
   const [query, setQuery] = useState('')
   const [freeText, setFreeText] = useState('')
+  const [selectedGoalId, setSelectedGoalId] = useState<string>(NO_GOAL)
+  const [isCreating, setIsCreating] = useState(false)
 
   const activeBlock = useMemo(() => {
     if (!weeklySchedule) return null
     return findScheduleBlockForDateTime(weeklySchedule, new Date())
   }, [weeklySchedule])
 
+  // Sync open state with the floating UI store so other floating widgets
+  // (check-in pill, coach button) can step aside while this popover owns
+  // the bottom-right corner.
   useEffect(() => {
+    setStartTrackingOpen(open)
     if (!open) {
       setQuery('')
       setFreeText('')
+      setIsCreating(false)
     }
-  }, [open])
+    return () => setStartTrackingOpen(false)
+  }, [open, setStartTrackingOpen])
+
+  // Pre-fill goal with the active schedule block's goal whenever it changes
+  // or the popover opens. User can still override.
+  useEffect(() => {
+    if (open) {
+      setSelectedGoalId(activeBlock?.goalId || NO_GOAL)
+    }
+  }, [open, activeBlock?.goalId])
 
   const filtered = useMemo<Task[]>(() => {
     const q = query.trim().toLowerCase()
     const base: Task[] = tasks ?? []
     if (!q) {
-      // Surface tasks linked to the active block's goal first.
       const goalId = activeBlock?.goalId
       if (goalId) {
         return [...base].sort((a, b) => {
@@ -58,10 +73,6 @@ export function StartTrackingPopover({ open, onClose }: StartTrackingPopoverProp
     return base.filter((t: Task) => t.title.toLowerCase().includes(q)).slice(0, 12)
   }, [tasks, query, activeBlock])
 
-  // When the active schedule block has a linked goal but no tasks exist
-  // for that goal, surface a small hint above the list so the user
-  // understands why they don't see anything "on now" — but keep showing
-  // the rest of their tasks so they can still pick one quickly.
   const activeGoalHasNoTasks = useMemo(() => {
     if (!activeBlock?.goalId) return false
     const base: Task[] = tasks ?? []
@@ -80,20 +91,64 @@ export function StartTrackingPopover({ open, onClose }: StartTrackingPopoverProp
     onClose()
   }
 
+  // Free-text "Just track" — no task created, just a timer with the title.
+  // Kept for the quick-capture case where users don't want to commit to a
+  // task entity (e.g. tracking a 10-minute interruption).
   const startFreeform = () => {
     const trimmed = freeText.trim()
     if (!trimmed) {
       toast.error('Type what you are working on or pick a task')
       return
     }
-    start(trimmed, '', '', activeBlock?.goalId || '', activeBlock?.id || '')
+    const goalId = selectedGoalId === NO_GOAL ? '' : selectedGoalId
+    start(trimmed, '', '', goalId, activeBlock?.id || '')
     toast.success(`Tracking "${trimmed}"`)
     onClose()
+  }
+
+  // Create a real Task with the chosen goal, then start the timer pointing
+  // at that task. This way the work shows up under the goal in the Tasks
+  // page (previously, free-form titles only created a TimeEntry, which
+  // meant the goal had time logged against it but no matching task — very
+  // confusing).
+  const createTaskAndStart = async () => {
+    const trimmed = freeText.trim()
+    if (!trimmed) {
+      toast.error('Type a title for the task')
+      return
+    }
+    setIsCreating(true)
+    try {
+      const goalId = selectedGoalId === NO_GOAL ? undefined : selectedGoalId
+      const created = await createTaskMutation.mutateAsync({
+        title: trimmed,
+        goalId,
+        scheduleBlockId: activeBlock?.id || undefined,
+      } as any)
+      start(
+        created.title,
+        created.id,
+        created.category || '',
+        created.goalId || '',
+        activeBlock?.id || '',
+      )
+      onClose()
+    } catch {
+      // mutation already toasts the failure
+    } finally {
+      setIsCreating(false)
+    }
   }
 
   const dismissRef = useDismissable<HTMLDivElement>(open, onClose)
 
   if (!open) return null
+
+  const goalNameById = (id: string): string => {
+    if (id === NO_GOAL) return 'No goal'
+    const g = goals?.find((g) => g.id === id)
+    return g?.title || 'No goal'
+  }
 
   return (
     <div
@@ -149,7 +204,7 @@ export function StartTrackingPopover({ open, onClose }: StartTrackingPopoverProp
             {activeBlock?.goal?.title ? (
               <> <span className="font-semibold">({activeBlock.goal.title})</span></>
             ) : null}
-            . Other tasks shown below — or type a custom title at the bottom.
+            . Other tasks shown below, or type a custom title at the bottom to create one.
           </div>
         )}
         {!tasks ? (
@@ -172,9 +227,6 @@ export function StartTrackingPopover({ open, onClose }: StartTrackingPopoverProp
                     title={`Start tracking "${task.title}"`}
                     className="group/row flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-[#fff7d1]"
                   >
-                    {/* Visible play affordance — signals the whole row
-                        starts a timer when clicked. Brand-yellow on
-                        hover so it reads as the primary action. */}
                     <span
                       aria-hidden
                       className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-500 transition-colors group-hover/row:border-[#f2cc0d] group-hover/row:bg-[#f2cc0d] group-hover/row:text-zinc-900"
@@ -201,31 +253,64 @@ export function StartTrackingPopover({ open, onClose }: StartTrackingPopoverProp
       </div>
 
       <div className="border-t border-zinc-200 bg-zinc-50 p-2">
-        <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5">
+        <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
           Or start with a custom title
         </div>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={freeText}
-            onChange={(e) => setFreeText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-                startFreeform()
-              }
-            }}
-            placeholder="What are you working on?"
-            className="h-8 flex-1 rounded-md border border-zinc-200 bg-white px-2 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-[#f2cc0d] focus:outline-none focus:ring-1 focus:ring-[#f2cc0d]"
-          />
+        <input
+          type="text"
+          value={freeText}
+          onChange={(e) => setFreeText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              createTaskAndStart()
+            }
+          }}
+          placeholder="What are you working on?"
+          className="h-8 w-full rounded-md border border-zinc-200 bg-white px-2 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-[#f2cc0d] focus:outline-none focus:ring-1 focus:ring-[#f2cc0d]"
+        />
+        <div className="mt-1.5 flex items-center gap-1.5">
+          <label className="shrink-0 text-[10px] font-medium text-zinc-500" htmlFor="quick-start-goal">
+            Under
+          </label>
+          <select
+            id="quick-start-goal"
+            value={selectedGoalId}
+            onChange={(e) => setSelectedGoalId(e.target.value)}
+            title={`Goal: ${goalNameById(selectedGoalId)}`}
+            className="h-7 min-w-0 flex-1 rounded-md border border-zinc-200 bg-white px-1.5 text-[11px] text-zinc-900 focus:border-[#f2cc0d] focus:outline-none focus:ring-1 focus:ring-[#f2cc0d]"
+          >
+            <option value={NO_GOAL}>No goal</option>
+            {(goals ?? []).map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.title}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="mt-2 flex gap-2">
           <button
             type="button"
             onClick={startFreeform}
-            disabled={!freeText.trim()}
-            className="inline-flex h-8 items-center gap-1 rounded-md bg-[#f2cc0d] px-2.5 text-xs font-semibold text-zinc-900 shadow-sm hover:bg-[#dfb90c] disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={!freeText.trim() || isCreating}
+            title="Start a timer without creating a task"
+            className="inline-flex h-8 items-center gap-1 rounded-md border border-zinc-200 bg-white px-2.5 text-[11px] font-medium text-zinc-700 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <Play className="h-3 w-3" />
-            Start
+            Just track
+          </button>
+          <button
+            type="button"
+            onClick={createTaskAndStart}
+            disabled={!freeText.trim() || isCreating}
+            title="Create a task under the selected goal and start tracking"
+            className="inline-flex h-8 flex-1 items-center justify-center gap-1 rounded-md bg-[#f2cc0d] px-2.5 text-xs font-semibold text-zinc-900 shadow-sm hover:bg-[#dfb90c] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isCreating ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Plus className="h-3 w-3" />
+            )}
+            Create task & track
           </button>
         </div>
       </div>

@@ -99,7 +99,7 @@ export function TasksView({
     return (
       <div className="p-4 sm:p-6">
         <div className="px-0 sm:px-2 md:-ml-[3px] md:px-0">
-          <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm p-4 text-center font-mono text-sm text-gray-600 sm:p-6 sm:text-base">
+          <div className="rounded-xl border border-zinc-200 bg-white p-4 text-center font-mono text-sm text-gray-600 shadow-sm sm:p-6 sm:text-base">
             Select a goal to view tasks.
           </div>
         </div>
@@ -193,6 +193,12 @@ export function TasksView({
                 placeholder="Search tasks..."
                 value={searchQuery}
                 onChange={(e) => onSearchQueryChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape' && searchQuery) {
+                    e.preventDefault()
+                    onSearchQueryChange('')
+                  }
+                }}
                 className="h-8 w-44 rounded-md border border-zinc-200 bg-white px-3 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-[#f2cc0d] focus:outline-none focus:ring-1 focus:ring-[#f2cc0d] sm:w-56"
               />
               <Sheet>
