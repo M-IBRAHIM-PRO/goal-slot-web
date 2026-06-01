@@ -1,10 +1,13 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import Link from 'next/link'
 import { format, parseISO } from 'date-fns'
-import { ChevronDown, ChevronRight, Clock, FileText, Calendar } from 'lucide-react'
+import { ChevronDown, ChevronRight, Clock, FileText, Calendar, Pencil } from 'lucide-react'
 
 import type { DailyBreakdown, DetailedTimeEntry } from '@/features/reports/utils/types'
+import { EditTimeEntryModal } from '@/features/time-tracker/components/edit-time-entry-modal'
+import type { TimeEntry } from '@/features/time-tracker/utils/types'
 import { cn, formatDuration } from '@/lib/utils'
 
 interface DetailedReportViewProps {
@@ -37,6 +40,28 @@ export function DetailedReportView({
   includeTaskNotes = false,
 }: DetailedReportViewProps) {
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set(dailyBreakdown.map((d) => d.date)))
+  const [entryToEdit, setEntryToEdit] = useState<TimeEntry | null>(null)
+
+  // The report endpoint returns a denormalised DetailedTimeEntry. The
+  // edit modal expects the TimeEntry shape from the time-tracker module,
+  // so adapt fields without losing the linked task/goal context.
+  const openEditFor = (entry: DetailedTimeEntry) => {
+    const adapted: TimeEntry = {
+      id: entry.id,
+      taskName: entry.taskName,
+      duration: entry.duration,
+      date: entry.date,
+      notes: entry.notes ?? undefined,
+      goalId: entry.goal?.id ?? undefined,
+      goal: entry.goal
+        ? { id: entry.goal.id, title: entry.goal.title, color: entry.goal.color }
+        : undefined,
+      startedAt: entry.startedAt ?? undefined,
+      taskId: entry.task?.id ?? undefined,
+      taskTitle: entry.task?.title ?? undefined,
+    }
+    setEntryToEdit(adapted)
+  }
 
   const toggleDay = (date: string) => {
     setExpandedDays((prev) => {
@@ -102,14 +127,14 @@ export function DetailedReportView({
         <button
           type="button"
           onClick={expandAll}
-          className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-200 bg-white text-zinc-900 text-sm font-semibold px-4 py-2 transition-colors hover:bg-zinc-50 disabled:opacity-50 px-3 py-1 text-xs"
+          className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 px-4 py-1 py-2 text-sm text-xs font-semibold text-zinc-900 transition-colors hover:bg-zinc-50 disabled:opacity-50"
         >
           Expand All
         </button>
         <button
           type="button"
           onClick={collapseAll}
-          className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-200 bg-white text-zinc-900 text-sm font-semibold px-4 py-2 transition-colors hover:bg-zinc-50 disabled:opacity-50 px-3 py-1 text-xs"
+          className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 px-4 py-1 py-2 text-sm text-xs font-semibold text-zinc-900 transition-colors hover:bg-zinc-50 disabled:opacity-50"
         >
           Collapse All
         </button>
@@ -153,7 +178,13 @@ export function DetailedReportView({
             {expandedDays.has(day.date) && (
               <div className="divide-y divide-gray-100">
                 {day.entries.map((entry) => (
-                  <EntryRow key={entry.id} entry={entry} showScheduleContext={showScheduleContext} includeTaskNotes={includeTaskNotes} />
+                  <EntryRow
+                    key={entry.id}
+                    entry={entry}
+                    showScheduleContext={showScheduleContext}
+                    includeTaskNotes={includeTaskNotes}
+                    onEdit={() => openEditFor(entry)}
+                  />
                 ))}
                 {/* Daily Subtotal */}
                 <div className="flex items-center justify-end gap-4 bg-gray-50 px-4 py-2 font-mono text-sm">
@@ -176,17 +207,33 @@ export function DetailedReportView({
           )}
         </div>
       </div>
+
+      <EditTimeEntryModal
+        isOpen={!!entryToEdit}
+        onClose={() => setEntryToEdit(null)}
+        entry={entryToEdit}
+      />
     </div>
   )
 }
 
-function EntryRow({ entry, showScheduleContext, includeTaskNotes }: { entry: DetailedTimeEntry; showScheduleContext: boolean; includeTaskNotes?: boolean }) {
+function EntryRow({
+  entry,
+  showScheduleContext,
+  includeTaskNotes,
+  onEdit,
+}: {
+  entry: DetailedTimeEntry
+  showScheduleContext: boolean
+  includeTaskNotes?: boolean
+  onEdit: () => void
+}) {
   const startTime = entry.startedAt ? format(parseISO(entry.startedAt), 'h:mm a') : '-'
   const endTime = entry.endedAt ? format(parseISO(entry.endedAt), 'h:mm a') : '-'
   const hasScheduleBlock = showScheduleContext && entry.scheduleBlock && entry.scheduleBlock.title
 
   return (
-    <div className="grid grid-cols-1 gap-2 px-4 py-3 transition-colors hover:bg-gray-50 sm:grid-cols-12 sm:items-center sm:gap-0">
+    <div className="group/row relative grid grid-cols-1 gap-2 px-4 py-3 transition-colors hover:bg-gray-50 sm:grid-cols-12 sm:items-center sm:gap-0">
       {/* Time */}
       <div className="col-span-2 flex items-center gap-1 font-mono text-sm text-gray-600">
         <Clock className="h-3 w-3 sm:hidden" />
@@ -197,7 +244,17 @@ function EntryRow({ entry, showScheduleContext, includeTaskNotes }: { entry: Det
 
       {/* Task */}
       <div className="col-span-3">
-        <div className="font-medium">{entry.taskName}</div>
+        {entry.task ? (
+          <Link
+            href={`/dashboard/tasks?taskId=${entry.task.id}`}
+            title={`Open task "${entry.task.title}"`}
+            className="block truncate font-medium underline-offset-2 hover:text-[#8a7307] hover:underline"
+          >
+            {entry.taskName}
+          </Link>
+        ) : (
+          <div className="font-medium">{entry.taskName}</div>
+        )}
         {entry.task && entry.task.title !== entry.taskName && (
           <div className="text-xs text-gray-500">{entry.task.title}</div>
         )}
@@ -262,6 +319,20 @@ function EntryRow({ entry, showScheduleContext, includeTaskNotes }: { entry: Det
           </div>
         </div>
       )}
+
+      {/* Edit button. Absolute-positioned so it overlays the rightmost
+          column without needing to reshuffle the 12-column grid, and
+          revealed on row hover so it doesn't add visual noise to the
+          read-only report layout. Always visible on touch (sm:opacity-0). */}
+      <button
+        type="button"
+        onClick={onEdit}
+        title="Edit this entry"
+        aria-label={`Edit entry "${entry.taskName}"`}
+        className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md border border-zinc-200 bg-white p-1.5 text-zinc-600 opacity-100 shadow-sm transition-all hover:border-[#f2cc0d] hover:text-[#8a7307] sm:opacity-0 sm:group-hover/row:opacity-100"
+      >
+        <Pencil className="h-3.5 w-3.5" />
+      </button>
     </div>
   )
 }

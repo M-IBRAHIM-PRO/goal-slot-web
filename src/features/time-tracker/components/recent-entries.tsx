@@ -1,17 +1,20 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 
 import { EditTimeEntryModal } from '@/features/time-tracker/components/edit-time-entry-modal'
 import { useDeleteTimeEntry } from '@/features/time-tracker/hooks/use-time-tracker-mutations'
 import { TimeEntry } from '@/features/time-tracker/utils/types'
+import { useGoalsQuery } from '@/features/goals/hooks/use-goals-queries'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { CalendarRange, Clock, History, Pencil, Target, Trash2 } from 'lucide-react'
+import { CalendarRange, Clock, History, Pencil, Search, Target, Trash2, X } from 'lucide-react'
 
 import { timeEntriesApi } from '@/lib/api'
 import { formatDate, formatDuration } from '@/lib/utils'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { GoalSlotSpinner } from '@/components/goalslot-logo'
+
+const NO_GOAL_FILTER = '__NO_GOAL__'
 
 export function RecentEntries() {
   const deleteEntry = useDeleteTimeEntry()
@@ -21,15 +24,36 @@ export function RecentEntries() {
   const [pageSize, setPageSize] = useState(10)
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
+  const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch] = useState('')
+  const [goalFilter, setGoalFilter] = useState<string>('')
+
+  const { data: goals = [] } = useGoalsQuery()
+
+  // Debounce the search input so we don't fire a request per keystroke.
+  // 300ms is long enough to merge a fast typist's burst into one query
+  // and short enough to feel live.
+  useEffect(() => {
+    const handle = setTimeout(() => setSearch(searchInput.trim()), 300)
+    return () => clearTimeout(handle)
+  }, [searchInput])
+
+  // Any filter change should reset back to page 1, otherwise users land
+  // on an empty page-5 of a 2-page result and think the search broke.
+  useEffect(() => {
+    setPage(1)
+  }, [search, goalFilter, startDate, endDate])
 
   const recentQuery = useQuery({
-    queryKey: ['time-tracker', 'recent-entries', 'paged', page, pageSize, startDate, endDate],
+    queryKey: ['time-tracker', 'recent-entries', 'paged', page, pageSize, startDate, endDate, search, goalFilter],
     queryFn: async () => {
       const res = await timeEntriesApi.getRecent({
         page,
         pageSize,
         startDate: startDate || undefined,
         endDate: endDate || undefined,
+        search: search || undefined,
+        goalId: goalFilter || undefined,
       })
 
       const data = res.data as any
@@ -63,7 +87,16 @@ export function RecentEntries() {
   const showingFrom = total === 0 ? 0 : (page - 1) * pageSize + 1
   const showingTo = Math.min(page * pageSize, total)
 
-  const hasFilters = !!(startDate || endDate)
+  const hasFilters = !!(startDate || endDate || search || goalFilter)
+
+  const clearAllFilters = () => {
+    setStartDate('')
+    setEndDate('')
+    setSearchInput('')
+    setSearch('')
+    setGoalFilter('')
+    setPage(1)
+  }
 
   return (
     <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
@@ -74,39 +107,68 @@ export function RecentEntries() {
       </h2>
 
       <div className="mb-4 flex flex-wrap items-center gap-2 rounded-md border border-zinc-200 bg-white p-3 text-xs sm:text-sm">
+        <div className="relative min-w-[180px] flex-1">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400" />
+          <input
+            type="text"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape' && searchInput) {
+                e.preventDefault()
+                setSearchInput('')
+              }
+            }}
+            placeholder="Search task name or notes..."
+            className="h-8 w-full rounded-md border border-zinc-200 bg-white pl-8 pr-7 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-[#f2cc0d] focus:outline-none focus:ring-1 focus:ring-[#f2cc0d]"
+          />
+          {searchInput && (
+            <button
+              type="button"
+              onClick={() => setSearchInput('')}
+              title="Clear search"
+              aria-label="Clear search"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          )}
+        </div>
+        <select
+          value={goalFilter}
+          onChange={(e) => setGoalFilter(e.target.value)}
+          title="Filter by goal"
+          className="h-8 rounded-md border border-zinc-200 bg-white px-2 text-xs text-zinc-900 focus:border-[#f2cc0d] focus:outline-none focus:ring-1 focus:ring-[#f2cc0d]"
+        >
+          <option value="">All goals</option>
+          <option value={NO_GOAL_FILTER}>No goal</option>
+          {(goals as any[]).map((g) => (
+            <option key={g.id} value={g.id}>{g.title}</option>
+          ))}
+        </select>
         <div className="flex items-center gap-1">
           <span className="font-mono uppercase text-gray-700">From</span>
           <input
             type="date"
-            className="border border-zinc-200 px-2 py-1"
+            className="h-8 rounded-md border border-zinc-200 px-2 text-xs"
             value={startDate}
-            onChange={(e) => {
-              setStartDate(e.target.value)
-              setPage(1)
-            }}
+            onChange={(e) => setStartDate(e.target.value)}
           />
         </div>
         <div className="flex items-center gap-1">
           <span className="font-mono uppercase text-gray-700">To</span>
           <input
             type="date"
-            className="border border-zinc-200 px-2 py-1"
+            className="h-8 rounded-md border border-zinc-200 px-2 text-xs"
             value={endDate}
-            onChange={(e) => {
-              setEndDate(e.target.value)
-              setPage(1)
-            }}
+            onChange={(e) => setEndDate(e.target.value)}
           />
         </div>
         <button
           type="button"
-          className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 px-4 py-1 py-2 text-sm text-xs font-semibold text-zinc-900 transition-colors hover:bg-zinc-50 disabled:opacity-50"
-          onClick={() => {
-            setStartDate('')
-            setEndDate('')
-            setPage(1)
-          }}
-          disabled={(!startDate && !endDate) || recentQuery.isFetching}
+          className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-zinc-200 bg-white px-3 text-xs font-semibold text-zinc-900 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+          onClick={clearAllFilters}
+          disabled={!hasFilters || recentQuery.isFetching}
         >
           Clear filters
         </button>

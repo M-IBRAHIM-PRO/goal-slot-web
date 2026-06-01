@@ -211,8 +211,14 @@ export const timeEntriesApi = {
     api.get('/time-entries/range', { params: { startDate, endDate } }),
   getToday: () => api.get('/time-entries/today'),
   getWeeklyTotal: () => api.get('/time-entries/weekly-total'),
-  getRecent: (params?: { page?: number; pageSize?: number; startDate?: string; endDate?: string }) =>
-    api.get('/time-entries/recent', { params }),
+  getRecent: (params?: {
+    page?: number
+    pageSize?: number
+    startDate?: string
+    endDate?: string
+    search?: string
+    goalId?: string
+  }) => api.get('/time-entries/recent', { params }),
   create: (data: any) => api.post('/time-entries', data),
   update: (id: string, data: any) => api.put(`/time-entries/${id}`, data),
   delete: (id: string) => api.delete(`/time-entries/${id}`),
