@@ -16,6 +16,7 @@ import {
   Share2,
   Shield,
   Flag,
+  Sparkles,
   Users,
 } from 'lucide-react'
 
@@ -70,7 +71,12 @@ const adminNavItems = [
   { href: '/dashboard/admin/release-notes', label: 'Release Notes', icon: Megaphone },
 ]
 
-export function AppSidebar() {
+interface AppSidebarProps {
+  onOpenChangelog?: () => void
+  hasUnseenChangelog?: boolean
+}
+
+export function AppSidebar({ onOpenChangelog, hasUnseenChangelog }: AppSidebarProps = {}) {
   const router = useRouter()
   const pathname = usePathname()
   const { user, logout } = useAuthStore()
@@ -102,11 +108,25 @@ export function AppSidebar() {
   return (
     <Sidebar side="left" variant="sidebar" collapsible="icon">
       <SidebarHeader className="border-b border-zinc-200 p-4 group-data-[collapsible=icon]:p-2">
-        <div className="flex items-center gap-2">
-          <Link href="/dashboard" className="group-data-[collapsible=icon]:hidden">
-            <GoalSlotBrand size="md" tagline="Your growth, measured." />
+        <div className="flex items-center gap-2 justify-between w-full">
+          <Link href="/dashboard" className="group-data-[collapsible=icon]:hidden shrink-0">
+            <GoalSlotBrand size="sm" showTagline={false} />
           </Link>
-          <SidebarTrigger className="ml-auto h-8 w-8 rounded-md hover:bg-zinc-100 text-zinc-500 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:ml-0" />
+          <div className="flex items-center gap-1 shrink-0 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:gap-1.5 ml-auto">
+            <button
+              onClick={onOpenChangelog}
+              className="relative h-8 w-8 shrink-0 rounded-md hover:bg-zinc-100 text-zinc-500 
+              hidden md:flex items-center justify-center transition-colors animate-in fade-in zoom-in duration-200"
+              title="What's New"
+              aria-label="What's New changelog"
+            >
+              <Sparkles className="h-4 w-4" />
+              {hasUnseenChangelog && (
+                <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-[#f2cc0d] ring-1 ring-white" />
+              )}
+            </button>
+            <SidebarTrigger className="h-8 w-8 shrink-0 rounded-md hover:bg-zinc-100 text-zinc-500" />
+          </div>
         </div>
       </SidebarHeader>
 
