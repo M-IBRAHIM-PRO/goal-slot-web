@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-
+import { formatDuration } from '@/lib/utils'
 import { useTimeTrackerData } from '@/features/time-tracker/hooks/use-time-tracker-queries'
 import {
   findScheduleBlockForDateTime,
@@ -91,10 +91,7 @@ export function FocusNowBar() {
   const totalLen = Math.max(1, endMin - startMin)
   const elapsed = Math.max(0, Math.min(totalLen, nowMin - startMin))
   const minutesLeft = Math.max(0, endMin - nowMin)
-  const remaining =
-    minutesLeft >= 60
-      ? `${Math.floor(minutesLeft / 60)}h ${minutesLeft % 60}m left`
-      : `${minutesLeft}m left`
+  const remaining = `${formatDuration(minutesLeft)} left`
   const pct = Math.round((elapsed / totalLen) * 100)
 
   const upcomingLabel = upcoming ? describeUpcoming(now, upcoming.startsAt) : null

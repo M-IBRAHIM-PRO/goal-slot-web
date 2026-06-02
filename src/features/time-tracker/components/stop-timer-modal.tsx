@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { Textarea } from '@/components/ui/textarea'
+import { formatDuration } from '@/lib/utils'
 
 export interface StopTimerConfirmPayload {
   notes: string
@@ -71,15 +72,6 @@ export function StopTimerModal({
       setTaskTitle(taskName)
     }
   }, [isOpen, defaultGoalId, defaultCategory, defaultTaskId, taskName])
-
-  const formatDuration = (minutes: number) => {
-    const hours = Math.floor(minutes / 60)
-    const mins = minutes % 60
-    if (hours > 0) {
-      return `${hours}h ${mins}m`
-    }
-    return `${mins}m`
-  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()

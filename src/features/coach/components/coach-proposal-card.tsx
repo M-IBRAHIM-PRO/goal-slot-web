@@ -25,7 +25,7 @@ import {
   type CoachProposalBlock,
   type CoachProposalResult,
 } from '@/lib/api'
-import { cn, formatTime12h } from '@/lib/utils'
+import { cn, formatDuration, formatTime12h } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
 const ACTION_META: Record<
@@ -218,11 +218,7 @@ function describeAction(
       const subject = `"${taskName}"`
       const bits: string[] = []
       if (duration !== undefined) {
-        const h = Math.floor(duration / 60)
-        const m = duration % 60
-        bits.push(
-          h && m ? `${h}h ${m}m` : h ? `${h}h` : `${m}m`,
-        )
+        bits.push(formatDuration(duration))
       }
       if (date) {
         const d = new Date(`${date}T00:00:00`)
@@ -252,10 +248,7 @@ function describeAction(
         subjectBits.push(`"${existing.taskName || existing.taskTitle}"`)
       }
       if (typeof existing?.duration === 'number') {
-        const dur = existing.duration as number
-        const h = Math.floor(dur / 60)
-        const m = dur % 60
-        subjectBits.push(h && m ? `${h}h ${m}m` : h ? `${h}h` : `${m}m`)
+        subjectBits.push(formatDuration(existing.duration as number))
       }
       if (typeof existing?.date === 'string') {
         const d = new Date(existing.date)
@@ -281,7 +274,7 @@ function describeAction(
       }
       const bits: string[] = []
       if (typeof p.taskName === 'string') bits.push(`name to "${p.taskName}"`)
-      if (typeof p.duration === 'number') bits.push(`duration to ${p.duration}m`)
+      if (typeof p.duration === 'number') bits.push(`duration to ${formatDuration(p.duration)}`)
       if (typeof p.date === 'string') bits.push(`date to ${fmtDate(p.date)}`)
       return { subject, detail: bits.length ? `Change ${bits.join(', ')}.` : 'Update this entry.' }
     }
@@ -532,7 +525,7 @@ export function CoachProposalCard({ block, sourceMessageId }: CoachProposalCardP
                   )}
                 </div>
               )}
-              <div className="flex-1 min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span
                     className={cn(

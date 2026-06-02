@@ -12,6 +12,7 @@ import type { ReportFilters, ReportViewType } from '@/features/reports/utils/typ
 import { format } from 'date-fns'
 
 import { Loading } from '@/components/ui/loading'
+import { formatDuration } from '@/lib/utils'
 
 export interface ExportReportPreviewProps {
   filters: ReportFilters
@@ -44,7 +45,7 @@ export function ExportReportPreview({
 
   if (isLoading) {
     return (
-      <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm flex min-h-[400px] items-center justify-center">
+      <div className="flex min-h-[400px] items-center justify-center rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
         <Loading size="sm" />
       </div>
     )
@@ -52,7 +53,7 @@ export function ExportReportPreview({
 
   if (viewType === 'detailed' && detailedQuery.data) {
     return (
-      <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm min-h-[400px]">
+      <div className="min-h-[400px] rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
         <DetailedReportView
           dailyBreakdown={detailedQuery.data.dailyBreakdown}
           summary={detailedQuery.data.summary}
@@ -67,7 +68,7 @@ export function ExportReportPreview({
 
   if (viewType === 'summary' && summaryQuery.data) {
     return (
-      <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm min-h-[400px]">
+      <div className="min-h-[400px] rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
         <SummaryReportView
           items={summaryQuery.data.items}
           dateBreakdown={summaryQuery.data.dateBreakdown}
@@ -82,7 +83,7 @@ export function ExportReportPreview({
 
   if (viewType === 'day_by_task' && dayByTaskQuery.data) {
     return (
-      <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm min-h-[400px] p-6">
+      <div className="min-h-[400px] rounded-xl border border-zinc-200 bg-white p-4 p-6 shadow-sm">
         <h3 className="mb-4 text-lg font-bold">Day by Task Report</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -115,12 +116,12 @@ export function ExportReportPreview({
                               </span>
                             )}
                           </span>
-                          <span className="font-mono text-xs text-gray-500">{task.totalFormatted}</span>
+                          <span className="font-mono text-xs text-gray-500">{formatDuration(task.totalMinutes)}</span>
                         </div>
                       ))}
                     </div>
                   </td>
-                  <td className="px-4 py-2 text-right align-top font-bold text-gray-900">{day.totalFormatted}</td>
+                  <td className="px-4 py-2 text-right align-top font-bold text-gray-900">{formatDuration(day.totalMinutes)}</td>
                 </tr>
               ))}
               {dayByTaskQuery.data.dailyBreakdown.length === 0 && (
@@ -139,14 +140,14 @@ export function ExportReportPreview({
 
   if (viewType === 'day_total' && dayTotalQuery.data) {
     return (
-      <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm min-h-[400px] p-6">
+      <div className="min-h-[400px] rounded-xl border border-zinc-200 bg-white p-4 p-6 shadow-sm">
         <h3 className="mb-4 text-lg font-bold">Day Total Report</h3>
         <div className="space-y-4">
           {dayTotalQuery.data.dailyBreakdown.map((day, i) => (
             <div key={i} className="border-2 border-gray-200 bg-white shadow-sm">
               <div className="flex items-center justify-between border-b-2 border-gray-200 bg-gray-50 px-4 py-3">
                 <span className="text-lg font-bold text-gray-900">{format(new Date(day.date), 'EEEE, MMMM d')}</span>
-                <span className="font-mono text-lg font-bold text-gray-900">{day.totalFormatted}</span>
+                <span className="font-mono text-lg font-bold text-gray-900">{formatDuration(day.totalMinutes)}</span>
               </div>
               <div className="divide-y divide-gray-100">
                 {day.goalGroups && day.goalGroups.length > 0 ? (
@@ -163,7 +164,7 @@ export function ExportReportPreview({
                         <div className="font-mono text-sm text-gray-600">{group.taskNames}</div>
                       </div>
                       <div className="flex-shrink-0 text-right">
-                        <span className="font-mono font-bold text-gray-700">{group.totalFormatted}</span>
+                        <span className="font-mono font-bold text-gray-700">{formatDuration(group.totalMinutes)}</span>
                       </div>
                     </div>
                   ))
@@ -184,7 +185,7 @@ export function ExportReportPreview({
   }
 
   return (
-    <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm flex min-h-[400px] items-center justify-center text-gray-500">
+    <div className="flex min-h-[400px] items-center justify-center rounded-xl border border-zinc-200 bg-white p-4 text-gray-500 shadow-sm">
       Select a date range to view your report
     </div>
   )

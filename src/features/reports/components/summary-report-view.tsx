@@ -92,7 +92,7 @@ export function SummaryReportView({
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="rounded-lg border border-zinc-200 bg-white p-3">
           <div className="text-xs font-medium uppercase text-gray-500">Total Time</div>
-          <div className="text-xl font-bold">{summary.totalFormatted}</div>
+          <div className="text-xl font-bold">{formatDuration(summary.totalMinutes)}</div>
           <div className="text-xs text-gray-500">{summary.totalHours.toFixed(1)} hours</div>
         </div>
         <div className="rounded-lg border border-zinc-200 bg-white p-3">
@@ -175,7 +175,7 @@ export function SummaryReportView({
                   axisLine={{ stroke: '#18181b', strokeWidth: 2 }}
                 />
                 <YAxis
-                  tickFormatter={(value) => `${(value / 60).toFixed(0)}h`}
+                  tickFormatter={(value) => formatDuration(Number(value))}
                   tick={{ fontSize: 10 }}
                   axisLine={{ stroke: '#18181b', strokeWidth: 2 }}
                 />
@@ -234,7 +234,7 @@ export function SummaryReportView({
               {/* Hours */}
               <div className="col-span-2 text-right font-mono">
                 <span className="text-sm text-gray-500 sm:hidden">Hours: </span>
-                {item.totalFormatted}
+                {formatDuration(item.totalMinutes)}
               </div>
 
               {/* Entries */}
@@ -273,7 +273,7 @@ export function SummaryReportView({
         <div className="flex items-center justify-between border-t border-zinc-200 bg-secondary px-4 py-3 text-white">
           <span className="font-semibold uppercase">Total</span>
           <div className="flex items-center gap-6">
-            <span className="text-xl font-bold">{summary.totalFormatted}</span>
+            <span className="text-xl font-bold">{formatDuration(summary.totalMinutes)}</span>
             {showBillable && billable && (
               <span className="rounded bg-white/20 px-2 py-1 text-sm">
                 ${billable.totalAmount.toFixed(2)}

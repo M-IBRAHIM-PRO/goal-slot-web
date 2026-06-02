@@ -1,8 +1,10 @@
 import { TimeEntry } from '@/features/time-tracker/utils/types'
 
 export interface DashboardStats {
-  todayFormatted: string
-  weeklyFormatted: string
+  todayMinutes: number
+  todayFormatted?: string
+  weeklyMinutes: number
+  weeklyFormatted?: string
   activeGoals: number
   tasksLogged: number
 }

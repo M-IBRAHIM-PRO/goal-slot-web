@@ -99,7 +99,7 @@ export function DetailedReportView({
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="rounded-lg border border-zinc-200 bg-white p-3">
           <div className="text-xs font-medium uppercase text-gray-500">Total Time</div>
-          <div className="text-xl font-bold">{summary.totalFormatted}</div>
+          <div className="text-xl font-bold">{formatDuration(summary.totalMinutes)}</div>
           <div className="text-xs text-gray-500">{summary.totalHours.toFixed(1)} hours</div>
         </div>
         <div className="rounded-lg border border-zinc-200 bg-white p-3">
@@ -170,7 +170,7 @@ export function DetailedReportView({
               </span>
               <span className="ml-auto font-mono text-sm text-gray-600">
                 {day.entries.length} {day.entries.length === 1 ? 'entry' : 'entries'} -{' '}
-                <span className="font-semibold text-zinc-900">{day.totalFormatted}</span>
+                <span className="font-semibold text-zinc-900">{formatDuration(day.totalMinutes)}</span>
               </span>
             </button>
 
@@ -189,7 +189,7 @@ export function DetailedReportView({
                 {/* Daily Subtotal */}
                 <div className="flex items-center justify-end gap-4 bg-gray-50 px-4 py-2 font-mono text-sm">
                   <span className="font-semibold uppercase text-gray-600">Day Total:</span>
-                  <span className="font-bold text-zinc-900">{day.totalFormatted}</span>
+                  <span className="font-bold text-zinc-900">{formatDuration(day.totalMinutes)}</span>
                 </div>
               </div>
             )}
@@ -199,7 +199,7 @@ export function DetailedReportView({
         {/* Grand Total */}
         <div className="flex items-center justify-end gap-4 border-t border-zinc-200 bg-secondary px-4 py-3 text-white">
           <span className="font-semibold uppercase">Grand Total:</span>
-          <span className="text-xl font-bold">{summary.totalFormatted}</span>
+          <span className="text-xl font-bold">{formatDuration(summary.totalMinutes)}</span>
           {showBillable && billable && (
             <span className="ml-4 rounded bg-white/20 px-2 py-1 text-sm">
               ${billable.totalAmount.toFixed(2)}
@@ -294,7 +294,7 @@ function EntryRow({
 
       {/* Duration */}
       <div className="col-span-2 font-mono text-sm font-semibold text-zinc-900">
-        {entry.durationFormatted}
+        {formatDuration(entry.duration)}
       </div>
 
       {/* Notes */}

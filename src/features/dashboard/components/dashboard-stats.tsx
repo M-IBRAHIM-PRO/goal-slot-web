@@ -2,6 +2,7 @@ import { DashboardStats as DashboardStatsType } from '@/features/dashboard/utils
 import { CheckSquare, Clock, Target, TrendingUp } from 'lucide-react'
 
 import { StatCard } from '@/components/ui/stat-card'
+import { formatDuration } from '@/lib/utils'
 
 interface DashboardStatsProps {
   stats?: DashboardStatsType
@@ -12,13 +13,13 @@ export function DashboardStats({ stats }: DashboardStatsProps) {
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <StatCard
         label="Today's Focus"
-        value={stats?.todayFormatted || '0m'}
+        value={formatDuration(stats?.todayMinutes ?? 0)}
         icon={<Clock />}
         accent="brand"
       />
       <StatCard
         label="Weekly Total"
-        value={stats?.weeklyFormatted || '0m'}
+        value={formatDuration(stats?.weeklyMinutes ?? 0)}
         icon={<TrendingUp />}
         accent="neutral"
       />

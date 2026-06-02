@@ -114,7 +114,7 @@ export function ExportReportsPageExportDialog({
                       <tr>
                          <td>${escapeHtml(d.date)}</td>
                          <td>${escapeHtml(t.taskName)}</td>
-                         <td>${escapeHtml(t.totalFormatted)}</td>
+                         <td>${escapeHtml(formatDuration(t.totalMinutes))}</td>
                       </tr>
                     `,
                           )
@@ -133,7 +133,7 @@ export function ExportReportsPageExportDialog({
                       <tr>
                          <td>${escapeHtml(d.date)}</td>
                          <td>${escapeHtml(d.taskNames)}</td>
-                         <td>${escapeHtml(d.totalFormatted)}</td>
+                         <td>${escapeHtml(formatDuration(d.totalMinutes))}</td>
                       </tr>
                     `,
                       )
@@ -150,7 +150,7 @@ export function ExportReportsPageExportDialog({
                       <tr>
                         <td>${escapeHtml(i.name)}</td>
                         <td>${escapeHtml(i.entriesCount)}</td>
-                        <td>${escapeHtml(i.totalFormatted)}</td>
+                        <td>${escapeHtml(formatDuration(i.totalMinutes))}</td>
                       </tr>`,
                       )
                       .join('')}
@@ -190,7 +190,7 @@ export function ExportReportsPageExportDialog({
                    ` : ''}
                    ${exportNotes ? `<div class="notes"><strong>Notes:</strong><br/>${escapeHtml(exportNotes)}</div>` : ''}
                    <div class="summary-box">
-                      <div><strong>Total Time</strong><br/>${escapeHtml(data.summary?.totalFormatted || '0h 0m')}</div>
+                      <div><strong>Total Time</strong><br/>${escapeHtml(formatDuration(data.summary?.totalMinutes ?? 0))}</div>
                       <div><strong>Total Entries</strong><br/>${escapeHtml(data.summary?.totalEntries ?? 0)}</div>
                       ${data.billable ? `<div><strong>Billable Amount</strong><br/>$${escapeHtml(data.billable.totalAmount)}</div>` : ''}
                    </div>
@@ -232,7 +232,7 @@ export function ExportReportsPageExportDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {trigger ?? (
-          <Button className="inline-flex items-center justify-center gap-2 rounded-lg bg-zinc-900 text-white text-sm font-semibold px-4 py-2 transition-colors hover:bg-zinc-800 disabled:opacity-50 gap-2">
+          <Button className="inline-flex items-center justify-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-zinc-800 disabled:opacity-50">
             <Download className="h-4 w-4" />
             Export Report
           </Button>

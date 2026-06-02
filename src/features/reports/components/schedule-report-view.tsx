@@ -47,7 +47,7 @@ function DayCell({ day, hasSchedule }: { day: ScheduleDayData; hasSchedule: bool
         'group relative flex h-full flex-col p-2 transition-colors',
         day.loggedMinutes > 0 ? 'bg-white' : 'bg-slate-50',
       )}
-      title={day.tasks.map((t) => `${t.taskName}: ${t.formatted}`).join('\n') || 'No time logged'}
+      title={day.tasks.map((t) => `${t.taskName}: ${formatDuration(t.minutes)}`).join('\n') || 'No time logged'}
     >
       {/* Progress bar background */}
       <div className="absolute inset-0 overflow-hidden">
@@ -65,7 +65,7 @@ function DayCell({ day, hasSchedule }: { day: ScheduleDayData; hasSchedule: bool
       <div className="relative z-10 flex h-full flex-col justify-between">
         <div className="text-center">
           <span className={cn('font-mono text-sm font-bold', getCompletionTextColor(day.percentage))}>
-            {day.loggedFormatted || '0m'}
+            {formatDuration(day.loggedMinutes)}
           </span>
         </div>
 
@@ -82,7 +82,7 @@ function DayCell({ day, hasSchedule }: { day: ScheduleDayData; hasSchedule: bool
               {day.tasks.slice(0, 5).map((task, i) => (
                 <div key={i} className="flex items-center justify-between text-xs">
                   <span className="truncate">{task.taskName}</span>
-                  <span className="ml-2 flex-shrink-0 font-mono text-slate-500">{task.formatted}</span>
+                  <span className="ml-2 flex-shrink-0 font-mono text-slate-500">{formatDuration(task.minutes)}</span>
                 </div>
               ))}
               {day.tasks.length > 5 && <div className="text-[10px] text-slate-400">+ {day.tasks.length - 5} more</div>}
@@ -146,7 +146,7 @@ function ScheduleRow({ row, days }: { row: ScheduleReportRow; days: ScheduleRepo
 
       {/* Total Column */}
       <div className="flex flex-col items-center justify-center bg-slate-50 p-2">
-        <span className="font-mono text-sm font-bold">{row.totalLoggedFormatted}</span>
+        <span className="font-mono text-sm font-bold">{formatDuration(row.totalLogged)}</span>
         <span
           className={cn(
             'font-mono text-[10px]',
@@ -175,7 +175,7 @@ export function ScheduleReportView({ data, isLoading }: ScheduleReportViewProps)
 
   if (!data || data.rows.length === 0) {
     return (
-      <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm py-16 text-center">
+      <div className="rounded-xl border border-zinc-200 bg-white p-4 py-16 text-center shadow-sm">
         <Calendar className="mx-auto mb-4 h-16 w-16 opacity-30" />
         <h3 className="mb-2 text-xl font-bold uppercase">No Schedule Data</h3>
         <p className="font-mono text-gray-600">No time entries with schedule blocks found for this period.</p>
@@ -194,23 +194,23 @@ export function ScheduleReportView({ data, isLoading }: ScheduleReportViewProps)
         animate={{ opacity: 1, y: 0 }}
         className="grid grid-cols-2 gap-4 md:grid-cols-4"
       >
-        <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm p-4">
+        <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
           <div className="flex items-center gap-2 text-gray-600">
             <Clock className="h-4 w-4" />
             <span className="font-mono text-xs uppercase">Logged</span>
           </div>
-          <div className="mt-2 text-2xl font-bold">{data.summary.totalFormatted}</div>
+          <div className="mt-2 text-2xl font-bold">{formatDuration(data.summary.totalMinutes)}</div>
         </div>
 
-        <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm p-4">
+        <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
           <div className="flex items-center gap-2 text-gray-600">
             <Calendar className="h-4 w-4" />
             <span className="font-mono text-xs uppercase">Expected</span>
           </div>
-          <div className="mt-2 text-2xl font-bold">{data.summary.totalExpectedFormatted}</div>
+          <div className="mt-2 text-2xl font-bold">{formatDuration(data.summary.totalExpectedMinutes)}</div>
         </div>
 
-        <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm p-4">
+        <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
           <div className="flex items-center gap-2 text-gray-600">
             <TrendingUp className="h-4 w-4" />
             <span className="font-mono text-xs uppercase">Completion</span>
@@ -229,7 +229,7 @@ export function ScheduleReportView({ data, isLoading }: ScheduleReportViewProps)
           </div>
         </div>
 
-        <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm p-4">
+        <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
           <div className="flex items-center gap-2 text-gray-600">
             <CheckCircle className="h-4 w-4" />
             <span className="font-mono text-xs uppercase">Schedules</span>
@@ -243,7 +243,7 @@ export function ScheduleReportView({ data, isLoading }: ScheduleReportViewProps)
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm overflow-hidden"
+        className="overflow-hidden rounded-xl border border-zinc-200 bg-white p-4 shadow-sm"
       >
         <div className="border-b border-zinc-200 bg-slate-50 p-4">
           <h3 className="flex items-center gap-2 text-lg font-bold uppercase">

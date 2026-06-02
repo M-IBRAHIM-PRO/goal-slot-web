@@ -463,7 +463,7 @@ function PublicShareViewContent() {
                   <BarChart data={stats.dailyData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                     <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-                    <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `${Math.floor(v / 60)}h`} />
+                    <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => formatDuration(Number(v))} />
                     <Tooltip
                       formatter={(value: number) => [formatDuration(value), 'Focus Time']}
                       labelFormatter={(label) => label}

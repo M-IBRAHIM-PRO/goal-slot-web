@@ -30,7 +30,7 @@ export function DashboardRecentActivity({ recentActivity }: DashboardRecentActiv
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg font-mono text-[10px] font-semibold text-zinc-900"
                   style={{ backgroundColor: (entry.goal?.color || '#FFD700') + '40' }}
                 >
-                  {formatDuration(entry.duration).replace(' ', '')}
+                  {formatDuration(entry.duration)}
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-zinc-900">{entry.taskName}</p>

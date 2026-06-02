@@ -6,7 +6,7 @@ import { useUpdateTimeEntry } from '@/features/time-tracker/hooks/use-time-track
 import { TimeEntry } from '@/features/time-tracker/utils/types'
 import { Pencil } from 'lucide-react'
 
-import { cn } from '@/lib/utils'
+import { cn, formatDuration } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -169,7 +169,7 @@ export function EditTimeEntryModal({ isOpen, onClose, entry }: EditTimeEntryModa
                     : 'bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-50',
                 )}
               >
-                {min >= 60 ? `${min / 60}h` : `${min}m`}
+                {formatDuration(min)}
               </button>
             ))}
           </div>

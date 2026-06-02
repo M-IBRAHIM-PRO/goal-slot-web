@@ -383,10 +383,7 @@ export function buildTimeGrid(
 }
 
 export function formatMinutesAsHoursTick(minutes: number): string {
-  if (minutes === 0) return '0'
-  const hours = minutes / 60
-  if (Number.isInteger(hours)) return `${hours}h`
-  return `${hours.toFixed(1)}h`
+  return formatDuration(minutes)
 }
 
 export function formatHourLabel(hour: number): string {
