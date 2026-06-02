@@ -77,6 +77,7 @@ export function GoalModal({ isOpen, onClose, goal }: GoalModalProps) {
     return categories.map((cat) => ({
       value: cat.value,
       label: cat.name,
+      // Omit 'hint' to avoid rendering redundant raw slug values (e.g. cat.value) under the clean label
       color: cat.color || undefined,
     }))
   }, [categories])

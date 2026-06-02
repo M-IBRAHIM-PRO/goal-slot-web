@@ -25,6 +25,7 @@ interface SearchableSelectProps {
   disabled?: boolean
   className?: string
   triggerClassName?: string
+  triggerStyle?: React.CSSProperties
 }
 
 /**
@@ -41,6 +42,7 @@ export function SearchableSelect({
   disabled = false,
   className,
   triggerClassName,
+  triggerStyle,
 }: SearchableSelectProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -116,6 +118,7 @@ export function SearchableSelect({
               'flex h-10 w-full items-center justify-between gap-2 rounded-lg border border-zinc-200 bg-white px-3 text-left text-sm transition-colors hover:border-zinc-300 focus:border-[#f2cc0d] focus:outline-none focus:ring-1 focus:ring-[#f2cc0d] disabled:cursor-not-allowed disabled:opacity-50',
               triggerClassName,
             )}
+            style={triggerStyle}
             aria-haspopup="listbox"
             aria-expanded={open}
           >

@@ -195,6 +195,8 @@ export function EditTimeEntryModal({ isOpen, onClose, entry }: EditTimeEntryModa
               onChange={(value) => setGoalId(value === 'no_goal' ? '' : value)}
               options={goalOptions}
               placeholder="Select goal"
+              triggerClassName={cn(selectedGoal && 'border-l-4')}
+              triggerStyle={selectedGoal ? { borderLeftColor: selectedGoal.color } : undefined}
             />
           </div>
         </form>
