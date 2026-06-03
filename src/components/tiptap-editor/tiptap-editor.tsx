@@ -67,37 +67,46 @@ import { SlashCommands } from './slash-commands'
 // Create lowlight instance with common languages
 const lowlight = createLowlight(common)
 
-// Surgical Backspace inside a list item.
+// Backspace inside a list item.
 //
-// Returns true if it handled the event (and called preventDefault); false
-// to let ProseMirror's default Backspace run.
+// Overrides are kept to the *minimum* surface area needed. ProseMirror's
+// default Backspace is correct in every case except two structural ones
+// listed below — for everything else we return false and let the default
+// run. Past attempts to "handle all Backspace cases" produced cascading
+// edge-case bugs (lifting the wrong list item, joinBackward picking the
+// wrong boundary in deep nests, etc); the architecture here is to be
+// surgical and otherwise stay out of ProseMirror's way.
 //
-// Three branches:
-//   1. Cursor not at start of an empty selection in a list item -> default.
-//   2. List item has TEXT content -> liftListItem. Strips the bullet but
-//      keeps the text where it is. Without this, the default joinBackward
-//      drags the text into the previous block (e.g. into a heading), which
-//      is the original "bullet text moved into heading" bug.
-//   3. List item is EMPTY:
-//      - With a previous sibling -> custom transaction that deletes the
-//        empty <li> and appends any nested children to the previous <li>.
-//        Children stay at their original visual depth (now under the prev
-//        item instead of under the deleted one). Avoids joinBackward,
-//        which finds boundaries at the wrong nesting level and collapses
-//        unrelated structure.
-//      - Without a previous sibling -> default. ProseMirror lifts cleanly.
+// Override 1 — "text moved into heading" case.
+//   Cursor at start of the first paragraph of the *first* item of a
+//   top-level list (no previous sibling list item). Default joinBackward
+//   would walk past the list boundary and merge the bullet's text into
+//   the previous doc-level block (a heading or paragraph), which feels
+//   like the text "jumped up" to the user. liftListItem strips the
+//   bullet marker and leaves the text in place.
+//
+// Override 2 — empty list item with a previous sibling ("Ernie" case).
+//   Cursor at start of an empty list item whose previous sibling is
+//   another list item. Default Backspace can either lift the empty item
+//   (moving any nested children up a level) or join across the wrong
+//   boundary in deeply nested structures. Instead we delete the empty
+//   <li> with a hand-rolled transaction and append any of its nested
+//   children to the previous <li>, preserving the children's visual
+//   depth.
 function handleListBackspace(ed: any, event: KeyboardEvent): boolean {
   const { selection } = ed.state
   if (!selection.empty) return false
-  if (selection.$from.parentOffset !== 0) return false
 
-  const inTaskItem = ed.isActive('taskItem')
-  const inListItem = ed.isActive('listItem')
-  if (!inTaskItem && !inListItem) return false
+  const { $from } = selection
+  if ($from.parentOffset !== 0) return false
 
-  const itemType = inTaskItem ? 'taskItem' : 'listItem'
+  const itemType = ed.isActive('taskItem')
+    ? 'taskItem'
+    : ed.isActive('listItem')
+      ? 'listItem'
+      : null
+  if (!itemType) return false
 
-  const { $from } = ed.state.selection
   let liDepth = -1
   for (let d = $from.depth; d >= 0; d--) {
     if ($from.node(d).type.name === itemType) {
@@ -107,57 +116,52 @@ function handleListBackspace(ed: any, event: KeyboardEvent): boolean {
   }
   if (liDepth < 0) return false
 
-  // Only intercept when the cursor is at the start of the FIRST block
-  // inside the <li>. Without this check, hitting Backspace at the start
-  // of a <p> that sits *after* a nested list inside the same <li> would
-  // also pass parentOffset===0 and we would lift the whole <li> a level,
-  // which is the "E.g. we push lifted out from under 'While you are
-  // building'" bug. Anything other than first-block-of-li -> pass through
-  // and let ProseMirror's default Backspace merge with the previous block.
+  // Cursor must be at the start of the <li>'s first block. If it sits
+  // in a 2nd+ block (a paragraph after a nested list inside the same
+  // <li>), default Backspace merges with the previous block within the
+  // same <li>, which is the correct behavior.
   if ($from.index(liDepth) !== 0) return false
 
   const liNode = $from.node(liDepth)
   const firstChild = liNode.firstChild
   const isItemEmpty = !firstChild || firstChild.content.size === 0
+  const isFirstItemOfList = $from.index(liDepth - 1) === 0
 
-  if (!isItemEmpty) {
+  if (!isItemEmpty && isFirstItemOfList) {
     if (!ed.can().liftListItem(itemType)) return false
     event.preventDefault()
     ed.chain().focus().liftListItem(itemType).run()
     return true
   }
 
-  const indexInParent = $from.index(liDepth - 1)
-  if (indexInParent === 0) return false
+  if (isItemEmpty && !isFirstItemOfList) {
+    const liStart = $from.before(liDepth)
+    const liEnd = $from.after(liDepth)
+    const prevLiInnerEnd = liStart - 1
 
-  const parentList = $from.node(liDepth - 1)
-  const prevLi = parentList.child(indexInParent - 1)
-  const liStart = $from.before(liDepth)
-  const liEnd = $from.after(liDepth)
-  const prevLiInnerEnd = liStart - 1
+    const nestedNodes: any[] = []
+    for (let i = 1; i < liNode.childCount; i++) {
+      nestedNodes.push(liNode.child(i))
+    }
 
-  const nestedNodes: any[] = []
-  for (let i = 1; i < liNode.childCount; i++) {
-    nestedNodes.push(liNode.child(i))
+    const tr = ed.state.tr
+    tr.delete(liStart, liEnd)
+
+    let insertPos = prevLiInnerEnd
+    for (const node of nestedNodes) {
+      tr.insert(insertPos, node)
+      insertPos += node.nodeSize
+    }
+
+    const cursorPos = Math.min(insertPos, tr.doc.content.size)
+    tr.setSelection(TextSelection.near(tr.doc.resolve(cursorPos)))
+
+    event.preventDefault()
+    ed.view.dispatch(tr)
+    return true
   }
 
-  void prevLi
-
-  const tr = ed.state.tr
-  tr.delete(liStart, liEnd)
-
-  let insertPos = prevLiInnerEnd
-  for (const node of nestedNodes) {
-    tr.insert(insertPos, node)
-    insertPos += node.nodeSize
-  }
-
-  const cursorPos = Math.min(insertPos, tr.doc.content.size)
-  tr.setSelection(TextSelection.near(tr.doc.resolve(cursorPos)))
-
-  event.preventDefault()
-  ed.view.dispatch(tr)
-  return true
+  return false
 }
 
 // Normalize stored HTML before handing it to ProseMirror. Notes that
