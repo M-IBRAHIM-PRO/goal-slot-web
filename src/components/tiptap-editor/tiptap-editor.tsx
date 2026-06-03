@@ -107,6 +107,15 @@ function handleListBackspace(ed: any, event: KeyboardEvent): boolean {
   }
   if (liDepth < 0) return false
 
+  // Only intercept when the cursor is at the start of the FIRST block
+  // inside the <li>. Without this check, hitting Backspace at the start
+  // of a <p> that sits *after* a nested list inside the same <li> would
+  // also pass parentOffset===0 and we would lift the whole <li> a level,
+  // which is the "E.g. we push lifted out from under 'While you are
+  // building'" bug. Anything other than first-block-of-li -> pass through
+  // and let ProseMirror's default Backspace merge with the previous block.
+  if ($from.index(liDepth) !== 0) return false
+
   const liNode = $from.node(liDepth)
   const firstChild = liNode.firstChild
   const isItemEmpty = !firstChild || firstChild.content.size === 0
