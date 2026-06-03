@@ -207,6 +207,14 @@
   @apply mt-1;
 }
 
+/* Block indent for paragraphs/headings via IndentExtension */
+.tiptap-editor .ProseMirror [data-indent="1"] { padding-left: 2rem; }
+.tiptap-editor .ProseMirror [data-indent="2"] { padding-left: 4rem; }
+.tiptap-editor .ProseMirror [data-indent="3"] { padding-left: 6rem; }
+.tiptap-editor .ProseMirror [data-indent="4"] { padding-left: 8rem; }
+.tiptap-editor .ProseMirror [data-indent="5"] { padding-left: 10rem; }
+.tiptap-editor .ProseMirror [data-indent="6"] { padding-left: 12rem; }
+
 .tiptap-editor .ProseMirror .task-list .task-list {
   @apply pl-6 mt-1;
 }

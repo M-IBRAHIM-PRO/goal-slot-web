@@ -59,6 +59,7 @@ import {
 
 import { cn } from '@/lib/utils'
 
+import { IndentExtension } from './indent-extension'
 import { ResizableImage } from './resizable-image'
 import { SlashCommands } from './slash-commands'
 
@@ -157,6 +158,7 @@ export function TiptapEditor({
       }),
       TextStyle,
       Color,
+      IndentExtension,
       SlashCommands,
     ],
     content,
@@ -164,6 +166,43 @@ export function TiptapEditor({
     editorProps: {
       attributes: {
         class: 'tiptap-editor-content',
+      },
+      // Word, Notion, and Google Docs ship paste payloads stuffed with
+      // mso-* styles, font tags, and unnecessary wrapper divs that make
+      // bullet toggles and indent commands silently no-op (the cursor
+      // ends up in a <span> or wrapper <div> instead of a paragraph).
+      // Strip the noise before ProseMirror parses the HTML so pasted
+      // content behaves like content typed in the editor.
+      transformPastedHTML: (html) => {
+        if (typeof window === 'undefined' || !html) return html
+        let cleaned = html
+          .replace(/<!--[\s\S]*?-->/g, '')
+          .replace(/<\/?(meta|style|link|script|o:p|w:[\w-]+|m:[\w-]+)[^>]*>/gi, '')
+          .replace(/<\/?(font)[^>]*>/gi, '')
+          .replace(/\sclass="[^"]*"/gi, '')
+          .replace(/\sstyle="[^"]*mso-[^"]*"/gi, '')
+          .replace(/\sstyle="\s*"/gi, '')
+        try {
+          const doc = new DOMParser().parseFromString(cleaned, 'text/html')
+          doc.querySelectorAll('b[id^="docs-internal-guid"]').forEach((el) => {
+            const parent = el.parentNode
+            if (!parent) return
+            while (el.firstChild) parent.insertBefore(el.firstChild, el)
+            parent.removeChild(el)
+          })
+          doc.querySelectorAll('div').forEach((div) => {
+            if (div.children.length === 0 && div.textContent?.trim()) {
+              const p = doc.createElement('p')
+              p.innerHTML = div.innerHTML
+              div.replaceWith(p)
+            }
+          })
+          cleaned = doc.body.innerHTML
+        } catch {
+          // If parsing throws (very malformed HTML), fall back to the
+          // regex-cleaned string and let ProseMirror do its best.
+        }
+        return cleaned
       },
       handleDrop: (view, event, slice, moved) => {
         // Handle image drops
@@ -224,36 +263,51 @@ export function TiptapEditor({
       // document-level listener) so it doesn't steal Tab from inputs
       // elsewhere on the page (share dialog, settings, etc).
       //
-      // We always preventDefault on Tab while the editor is focused —
-      // otherwise the browser shifts focus to the next focusable
-      // element and the user's selection is lost. Inside a list we
-      // sink/lift; outside a list we just swallow the key (no auto
-      // tab-to-spaces, matching Notion/Obsidian behavior).
-      //
-      // sinkListItem / liftListItem operate on the entire selection,
-      // so multi-line selections that span several list items all
-      // indent/outdent together as expected.
+      // Three cases, checked in order:
+      //   1. Inside a table cell -> return false so the Table extension's
+      //      built-in Tab handler navigates between cells.
+      //   2. Inside any list item (bullet, ordered, task) -> sink / lift.
+      //      sinkListItem can refuse if the item is the first child of
+      //      its parent list (ProseMirror constraint); in that case we
+      //      fall through to block indent so the user still sees a
+      //      response instead of a dead key.
+      //   3. Anywhere else (paragraph, heading, including across a
+      //      multi-line selection) -> indent / outdent the block via the
+      //      IndentExtension, which writes a data-indent attribute the
+      //      CSS layer renders as padding-left.
       handleKeyDown: (_view, event) => {
         if (event.key !== 'Tab') return false
         const ed = editorRef.current
         if (!ed) return false
+
+        if (ed.isActive('table')) return false
 
         event.preventDefault()
 
         const inTaskItem = ed.isActive('taskItem')
         const inListItem = ed.isActive('listItem')
 
-        if (!inTaskItem && !inListItem) {
-          // Plain text / heading / quote selection — consume to keep
-          // focus, but don't insert anything.
-          return true
+        if (inTaskItem || inListItem) {
+          const itemType = inTaskItem ? 'taskItem' : 'listItem'
+          if (event.shiftKey) {
+            const lifted = ed.can().liftListItem(itemType)
+            if (lifted) {
+              ed.chain().focus().liftListItem(itemType).run()
+              return true
+            }
+          } else {
+            const sunk = ed.can().sinkListItem(itemType)
+            if (sunk) {
+              ed.chain().focus().sinkListItem(itemType).run()
+              return true
+            }
+          }
         }
 
-        const itemType = inTaskItem ? 'taskItem' : 'listItem'
         if (event.shiftKey) {
-          ed.chain().focus().liftListItem(itemType).run()
+          ed.chain().focus().outdentBlock().run()
         } else {
-          ed.chain().focus().sinkListItem(itemType).run()
+          ed.chain().focus().indentBlock().run()
         }
         return true
       },
