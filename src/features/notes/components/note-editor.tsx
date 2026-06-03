@@ -127,6 +127,7 @@ export function NoteEditor({ note, onDelete, readOnly = false, sharedBy = null }
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const isInitialized = useRef(false)
   const noteIdRef = useRef(note.id)
+  const tiptapRef = useRef<{ commands: { focus: (pos?: 'end' | 'start') => any } } | null>(null)
   const [editorContent, setEditorContent] = useState(() => convertOldContentToHtml(note.content || ''))
 
   // Update when note changes
@@ -154,6 +155,15 @@ export function NoteEditor({ note, onDelete, readOnly = false, sharedBy = null }
     const newTitle = e.target.value
     setTitle(newTitle)
     debouncedSaveTitle(newTitle)
+  }
+
+  // Enter in the title moves focus to the body so the user can start
+  // writing without a mouse reach. Notion/Obsidian both do this. Also
+  // catches the rare case where the title gets re-focused by accident.
+  const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'Enter' || e.shiftKey) return
+    e.preventDefault()
+    tiptapRef.current?.commands.focus('end')
   }
 
   // Handle content change
@@ -340,6 +350,7 @@ export function NoteEditor({ note, onDelete, readOnly = false, sharedBy = null }
             type="text"
             value={title}
             onChange={handleTitleChange}
+            onKeyDown={handleTitleKeyDown}
             placeholder="Untitled"
             readOnly={readOnly}
             className="min-w-0 flex-1 bg-transparent text-lg font-bold outline-none placeholder:text-muted-foreground md:text-xl"
@@ -502,6 +513,9 @@ export function NoteEditor({ note, onDelete, readOnly = false, sharedBy = null }
             editable={!readOnly}
             placeholder={readOnly ? '' : "Start typing... Use '/' for commands"}
             className="h-full"
+            onReady={(ed) => {
+              tiptapRef.current = ed as typeof tiptapRef.current
+            }}
           />
         </div>
       </div>
