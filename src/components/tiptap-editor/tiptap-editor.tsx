@@ -219,6 +219,24 @@ function normalizeEditorHtml(html: string): string {
       el.removeAttribute('data-indent')
     })
 
+    // Strip layout-y inline styles that survived from earlier paste
+    // sanitizer versions (or from paste-then-save round-trips that
+    // bypassed transformPastedHTML). Critically this removes
+    // line-height / height / position / transform values that some
+    // Word/Notion paste payloads ship with !important, which then beat
+    // our CSS guard and collapse blocks so paragraphs overlap. The
+    // [^;]+ in the value pattern captures any trailing !important
+    // along with the value itself. Run here on every content load so
+    // historical notes with bad inline styles self-heal.
+    const layoutStyleRe =
+      /\s*(padding|margin|text-indent|line-height|height|min-height|max-height|position|top|left|right|bottom|transform|float|clear|display|overflow|vertical-align|white-space)[\w-]*\s*:[^;]+;?/gi
+    doc.querySelectorAll('[style]').forEach((el) => {
+      const before = el.getAttribute('style') || ''
+      const after = before.replace(layoutStyleRe, '').trim()
+      if (!after) el.removeAttribute('style')
+      else el.setAttribute('style', after)
+    })
+
     const mergeAdjacentLists = (tag: 'ul' | 'ol') => {
       let merged = true
       while (merged) {
