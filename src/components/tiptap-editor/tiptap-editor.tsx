@@ -311,6 +311,26 @@ export function TiptapEditor({
           color: '#FFCC00',
           width: 4,
         },
+        // Inline-style every paragraph and heading directly via Tiptap's
+        // HTMLAttributes config. Reason: CSS-only spacing rules in
+        // tiptap-editor.css were being defeated by a still-unidentified
+        // path (cache, Tailwind purge in some context, or an inline
+        // style from a paste payload landing with !important). Inline
+        // style attributes on the rendered node are inserted into the
+        // HTML directly by ProseMirror's renderer, so they survive the
+        // CSS cascade entirely and can never be missed.
+        paragraph: {
+          HTMLAttributes: {
+            style:
+              'padding-top:0.4em;padding-bottom:0.4em;line-height:1.55;min-height:1.5em;display:block;position:static;float:none;clear:none;',
+          },
+        },
+        heading: {
+          HTMLAttributes: {
+            style:
+              'padding-top:0.5em;padding-bottom:0.5em;line-height:1.4;display:block;position:static;float:none;clear:none;',
+          },
+        },
       }),
       Placeholder.configure({
         placeholder: ({ node }) => {
