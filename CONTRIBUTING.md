@@ -3,6 +3,12 @@
 Thanks for wanting to help. The single most important rule below is the
 **claim-before-you-code** flow. Read it before you do anything else.
 
+**Brand new to open source or to this codebase?** Start with
+[SETUP.md](SETUP.md). It walks through forking, cloning, environment
+variables, and getting the dev server running for the first time. Once
+you have the project running, come back here to learn the contribution
+flow.
+
 ---
 
 ## Claim-before-you-code (the only rule we will reject PRs over)
