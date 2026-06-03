@@ -163,25 +163,23 @@ function handleListBackspace(ed: any, event: KeyboardEvent): boolean {
   const isItemEmpty = !firstChild || firstChild.content.size === 0
 
   if (!isItemEmpty) {
-    // Both liftListItem and the default joinBackward produce unwanted
-    // results when applied to nested bullets in unusual structural
-    // arrangements (empty parent LIs, deep nesting, etc.) — the user
-    // reported both the "cursor jumps to Ernie" case (liftListItem)
-    // and the "entire Comparison Tests System subtree moves" case
-    // (default joinBackward walking up too far). The only situation
-    // where ANY intervention is provably safe is when the bullet is a
-    // top-level first child of its parent list, where the default
-    // would otherwise merge text into the preceding heading or
-    // paragraph above the list — the original "text moved into
-    // heading" bug. Everywhere else we explicitly consume the
-    // Backspace and do nothing: zero risk of structural collapse, and
-    // the user retains normal text editing on text and ArrowKey+Delete
-    // for cross-bullet merges.
-    const hasPrevSibling = $from.index(liDepth - 1) > 0
-    if (hasPrevSibling) {
-      event.preventDefault()
-      return true
-    }
+    // Top-level bullets (parent <ul> is a direct child of the document,
+    // not nested inside another list item) always lift on Backspace at
+    // offset 0. This is the standard outliner UX: remove the bullet,
+    // keep the text as a paragraph at the document level. Works for
+    // both first-of-list (the original "text moved into heading" fix)
+    // AND middle-of-list (user's GTM-Agents case) — middle-of-list
+    // lifts split the list, with the lifted item becoming a paragraph
+    // between the two halves and any nested children of the lifted
+    // item becoming a new top-level list below.
+    //
+    // Nested bullets are a different story. Both liftListItem and the
+    // default joinBackward produce unwanted structural changes there
+    // (the user reported the "cursor jumps to Ernie" lift collapse AND
+    // the "entire Comparison Tests System subtree moves" joinBackward
+    // collapse). The safest move is a hard no-op for nested bullets:
+    // the user can still type, use arrow keys, and delete text inside
+    // the bullet, but Backspace at offset 0 will not reshape the tree.
     const grandparentDepth = liDepth - 2
     const isTopLevelList =
       grandparentDepth >= 0 &&
