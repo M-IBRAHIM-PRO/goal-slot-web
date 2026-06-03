@@ -42,7 +42,13 @@ export function htmlToMarkdown(html: string): string {
 }
 
 export function slugifyFilename(value: string): string {
-  return `${value}-slugified`
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[\s_]+/g, '-')
+    .replace(/[^\w-]/g, '')
+    .replace(/--+/g, '-')
+    .replace(/^-+|-+$/g, '')
 }
 
 interface NoteFrontmatterInput {
@@ -52,7 +58,7 @@ interface NoteFrontmatterInput {
 }
 
 function escapeYamlString(value: string): string {
-  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r')
 }
 
 export function buildNoteMarkdown(note: NoteFrontmatterInput, html: string): string {
