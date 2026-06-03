@@ -66,6 +66,68 @@ import { SlashCommands } from './slash-commands'
 // Create lowlight instance with common languages
 const lowlight = createLowlight(common)
 
+// Normalize stored HTML before handing it to ProseMirror. Notes that
+// went through earlier versions of this editor accumulated structural
+// noise that breaks downstream commands like sinkListItem:
+//   - Empty <p data-indent="N"> blocks left over from a bug where Tab
+//     in a list fell through to indentBlock.
+//   - Adjacent <ul>/<ol> blocks of the same type separated by empty
+//     paragraphs, so what should be one list renders as several. A
+//     lone <li> inside its own <ul> cannot be sunk because the command
+//     requires a previous sibling.
+//   - data-indent attributes on paragraphs nested inside <li>, which
+//     pushed text far to the right of its bullet marker.
+// This runs once per content prop change and is a no-op for clean HTML.
+function normalizeEditorHtml(html: string): string {
+  if (typeof window === 'undefined' || !html) return html
+  try {
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+
+    doc.querySelectorAll('p[data-indent]').forEach((p) => {
+      const hasText = (p.textContent || '').trim().length > 0
+      const hasMedia = p.querySelector('img, a, code, video, audio')
+      if (!hasText && !hasMedia) p.remove()
+    })
+
+    doc.querySelectorAll('li [data-indent]').forEach((el) => {
+      el.removeAttribute('data-indent')
+    })
+
+    const mergeAdjacentLists = (tag: 'ul' | 'ol') => {
+      let merged = true
+      while (merged) {
+        merged = false
+        const lists = Array.from(doc.querySelectorAll(tag))
+        for (const list of lists) {
+          let next = list.nextElementSibling
+          while (
+            next &&
+            next.tagName === 'P' &&
+            !(next.textContent || '').trim() &&
+            !next.querySelector('img, a, code, video, audio')
+          ) {
+            const after = next.nextElementSibling
+            next.remove()
+            next = after
+          }
+          if (next && next.tagName.toLowerCase() === tag) {
+            while (next.firstChild) list.appendChild(next.firstChild)
+            next.remove()
+            merged = true
+            break
+          }
+        }
+      }
+    }
+    mergeAdjacentLists('ul')
+    mergeAdjacentLists('ol')
+
+    return doc.body.innerHTML
+  } catch {
+    return html
+  }
+}
+
 interface TiptapEditorProps {
   content?: string
   onChange?: (html: string, json: any) => void
@@ -161,7 +223,7 @@ export function TiptapEditor({
       IndentExtension,
       SlashCommands,
     ],
-    content,
+    content: normalizeEditorHtml(content),
     editable,
     editorProps: {
       attributes: {
