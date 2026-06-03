@@ -631,21 +631,21 @@ export function TiptapEditor({
 
           <div className="toolbar-group">
             <button
-              onClick={() => editor.chain().focus().toggleBulletList().run()}
+              onClick={() => editor.chain().focus().clearIndent().toggleBulletList().run()}
               className={cn('toolbar-btn', editor.isActive('bulletList') && 'is-active')}
               title="Bullet List"
             >
               <List className="h-4 w-4" />
             </button>
             <button
-              onClick={() => editor.chain().focus().toggleOrderedList().run()}
+              onClick={() => editor.chain().focus().clearIndent().toggleOrderedList().run()}
               className={cn('toolbar-btn', editor.isActive('orderedList') && 'is-active')}
               title="Numbered List"
             >
               <ListOrdered className="h-4 w-4" />
             </button>
             <button
-              onClick={() => editor.chain().focus().toggleTaskList().run()}
+              onClick={() => editor.chain().focus().clearIndent().toggleTaskList().run()}
               className={cn('toolbar-btn', editor.isActive('taskList') && 'is-active')}
               title="Task List"
             >

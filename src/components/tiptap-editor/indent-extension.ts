@@ -5,6 +5,7 @@ declare module '@tiptap/core' {
     blockIndent: {
       indentBlock: () => ReturnType
       outdentBlock: () => ReturnType
+      clearIndent: () => ReturnType
     }
   }
 }
@@ -76,9 +77,27 @@ export const IndentExtension = Extension.create<IndentOptions>({
       return touched
     }
 
+    const reset = () => () => ({ state, tr, dispatch }: any) => {
+      const { selection } = state
+      const { from, to } = selection
+      let touched = false
+
+      state.doc.nodesBetween(from, to, (node: any, pos: number) => {
+        if (!this.options.types.includes(node.type.name)) return true
+        if (!node.attrs.indent) return true
+        tr.setNodeMarkup(pos, undefined, { ...node.attrs, indent: 0 })
+        touched = true
+        return true
+      })
+
+      if (touched && dispatch) dispatch(tr)
+      return touched
+    }
+
     return {
       indentBlock: adjust(1),
       outdentBlock: adjust(-1),
+      clearIndent: reset(),
     }
   },
 })
