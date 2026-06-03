@@ -385,11 +385,18 @@ export function TiptapEditor({
               div.replaceWith(p)
             }
           })
-          // Strip layout-only inline styles (padding, margin, text-indent)
-          // from every element. These survive a copy from Notion / Word /
-          // Google Docs and would otherwise render as a huge gap between
-          // bullet markers and text once parsed by ProseMirror.
-          const layoutStyleRe = /\s*(padding|margin|text-indent)[\w-]*\s*:[^;]+;?/gi
+          // Strip every layout-y inline style. These survive a copy from
+          // Notion / Word / Google Docs and produce a chain of nasty
+          // visual bugs once parsed by ProseMirror: padding/margin/
+          // text-indent shove text away from its bullet marker;
+          // line-height/height/min-height collapse blocks so the next
+          // paragraph overlaps the wrap of the previous one (the
+          // "Bar Raiser merges into Evaluation Test" rendering);
+          // position/top/transform/float pull blocks out of normal flow.
+          // We keep only color, font-weight, font-style and similar
+          // pure-presentation styles that are safe to round-trip.
+          const layoutStyleRe =
+            /\s*(padding|margin|text-indent|line-height|height|min-height|max-height|position|top|left|right|bottom|transform|float|clear|display|overflow|vertical-align|white-space)[\w-]*\s*:[^;]+;?/gi
           doc.querySelectorAll('[style]').forEach((el) => {
             const before = el.getAttribute('style') || ''
             const after = before.replace(layoutStyleRe, '').trim()

@@ -156,6 +156,26 @@
   @apply leading-relaxed;
 }
 
+/* Defensive: pasted content from Word/Notion/Google Docs sometimes ships
+   block elements with inline line-height/height/position styles that
+   collapse the box so the next paragraph overlaps its predecessor's
+   wrap. The paste sanitizer strips these styles before parse, but even
+   if one slips through, force every block-level descendant inside the
+   editor back to normal flow with a safe minimum line-height. Nothing
+   inside the editor needs absolute positioning. */
+.tiptap-editor .ProseMirror p,
+.tiptap-editor .ProseMirror li,
+.tiptap-editor .ProseMirror h1,
+.tiptap-editor .ProseMirror h2,
+.tiptap-editor .ProseMirror h3,
+.tiptap-editor .ProseMirror blockquote {
+  line-height: 1.55 !important;
+  position: static !important;
+  float: none !important;
+  clear: none !important;
+  vertical-align: baseline !important;
+}
+
 /* Lists */
 .tiptap-editor .ProseMirror ul {
   @apply list-disc pl-6;
