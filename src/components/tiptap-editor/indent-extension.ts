@@ -55,6 +55,22 @@ export const IndentExtension = Extension.create<IndentOptions>({
   },
 
   addCommands() {
+    // Walk up from a position to check whether any ancestor is a list
+    // item. Source of truth for "is this block visually inside a bullet?"
+    // Used to refuse writing data-indent onto a paragraph that sits inside
+    // a <li>, since the bullet itself already expresses the visual indent
+    // and an additional margin-left produces the "huge gap between marker
+    // and text" bug. Defense in depth alongside the CSS guard and the
+    // sanitizer's data-indent strip.
+    const isInsideListItem = (state: any, pos: number): boolean => {
+      const $pos = state.doc.resolve(pos)
+      for (let d = $pos.depth; d >= 0; d--) {
+        const name = $pos.node(d).type.name
+        if (name === 'listItem' || name === 'taskItem') return true
+      }
+      return false
+    }
+
     const adjust = (delta: number) => () => ({ state, tr, dispatch }: any) => {
       const { selection } = state
       const { from, to } = selection
@@ -62,6 +78,7 @@ export const IndentExtension = Extension.create<IndentOptions>({
 
       state.doc.nodesBetween(from, to, (node: any, pos: number) => {
         if (!this.options.types.includes(node.type.name)) return true
+        if (isInsideListItem(state, pos)) return true
         const current = (node.attrs.indent as number) || 0
         const next = Math.max(
           this.options.minLevel,

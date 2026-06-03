@@ -67,23 +67,43 @@ import { SlashCommands } from './slash-commands'
 // Create lowlight instance with common languages
 const lowlight = createLowlight(common)
 
-// Backspace inside a list item. Architecture: only intervene when the
-// cursor sits at the very start of the <li>'s first block. Past attempts
-// to handle every Backspace position produced cascading edge cases, so
-// the guard at $from.index(liDepth) !== 0 keeps us out of any "cursor
-// inside a 2nd+ block of an <li>" situation — those go to ProseMirror's
-// default, which correctly joins with the previous block.
+// Walks $from upward to find an ancestor list item. Single source of
+// truth for "are we in a list?" — used by both Tab and Backspace routing.
+function findListItemAtCursor(state: any): { itemType: 'listItem' | 'taskItem'; liDepth: number } | null {
+  const { $from } = state.selection
+  for (let d = $from.depth; d >= 0; d--) {
+    const name = $from.node(d).type.name
+    if (name === 'listItem' || name === 'taskItem') {
+      return { itemType: name, liDepth: d }
+    }
+  }
+  return null
+}
+
+// Backspace inside a list item.
 //
-// When the cursor IS at the start of the <li>'s first block:
-//   - Empty <li> with a previous sibling -> surgical delete that folds
-//     any nested children into the previous <li>. Avoids joinBackward,
-//     which can pick the wrong boundary in deep nests and yank entire
-//     subtrees up a level.
-//   - Otherwise -> liftListItem. Strips the bullet marker and leaves the
-//     text where it is. Covers both "Backspace removes a non-empty
-//     bullet's marker" (Notion-style indent-left UX) and the original
-//     "text moved into the heading above" bug, which was the default
-//     joinBackward dragging the first bullet's text up into the heading.
+// Architecture: trust ProseMirror's defaults for everything except the
+// two cases where they produce documented surprises. The guard at
+// $from.index(liDepth) !== 0 keeps us out of any cursor-in-2nd+-block
+// situation (the "l increase speed" bug), so default joinBackward
+// handles those naturally. When the cursor IS at the start of the LI's
+// first block:
+//
+//   - Non-empty LI -> liftListItem. Strips the bullet marker, keeps text.
+//     Fixes the original "text merged into heading" bug AND the general
+//     "Backspace at start of bullet should outdent" UX expectation.
+//
+//   - Empty LI with previous sibling AND nested children -> surgical
+//     transaction that deletes the empty LI and folds its nested children
+//     into the previous sibling. Avoids joinBackward, which can pick the
+//     wrong boundary in deep nests (the "Ernie un-tabs" bug).
+//
+//   - Empty LI with previous sibling and NO nested children -> default
+//     joinBackward correctly removes the empty LI and parks cursor at end
+//     of previous sibling. Industry-universal, ProseMirror gets it right.
+//
+//   - Empty LI with no previous sibling -> default joinBackward lifts
+//     cleanly to a paragraph at the parent level. Correct.
 function handleListBackspace(ed: any, event: KeyboardEvent): boolean {
   const { selection } = ed.state
   if (!selection.empty) return false
@@ -91,59 +111,84 @@ function handleListBackspace(ed: any, event: KeyboardEvent): boolean {
   const { $from } = selection
   if ($from.parentOffset !== 0) return false
 
-  const itemType = ed.isActive('taskItem')
-    ? 'taskItem'
-    : ed.isActive('listItem')
-      ? 'listItem'
-      : null
-  if (!itemType) return false
-
-  let liDepth = -1
-  for (let d = $from.depth; d >= 0; d--) {
-    if ($from.node(d).type.name === itemType) {
-      liDepth = d
-      break
-    }
-  }
-  if (liDepth < 0) return false
+  const inList = findListItemAtCursor(ed.state)
+  if (!inList) return false
+  const { itemType, liDepth } = inList
 
   if ($from.index(liDepth) !== 0) return false
 
   const liNode = $from.node(liDepth)
   const firstChild = liNode.firstChild
   const isItemEmpty = !firstChild || firstChild.content.size === 0
-  const isFirstItemOfList = $from.index(liDepth - 1) === 0
 
-  if (isItemEmpty && !isFirstItemOfList) {
-    const liStart = $from.before(liDepth)
-    const liEnd = $from.after(liDepth)
-    const prevLiInnerEnd = liStart - 1
-
-    const nestedNodes: any[] = []
-    for (let i = 1; i < liNode.childCount; i++) {
-      nestedNodes.push(liNode.child(i))
-    }
-
-    const tr = ed.state.tr
-    tr.delete(liStart, liEnd)
-
-    let insertPos = prevLiInnerEnd
-    for (const node of nestedNodes) {
-      tr.insert(insertPos, node)
-      insertPos += node.nodeSize
-    }
-
-    const cursorPos = Math.min(insertPos, tr.doc.content.size)
-    tr.setSelection(TextSelection.near(tr.doc.resolve(cursorPos)))
-
+  if (!isItemEmpty) {
+    if (!ed.can().liftListItem(itemType)) return false
     event.preventDefault()
-    ed.view.dispatch(tr)
+    ed.chain().focus().liftListItem(itemType).run()
     return true
   }
 
-  if (!ed.can().liftListItem(itemType)) return false
+  const hasPrevSibling = $from.index(liDepth - 1) > 0
+  const hasNestedChildren = liNode.childCount > 1
+
+  if (!hasPrevSibling || !hasNestedChildren) return false
+
+  const liStart = $from.before(liDepth)
+  const liEnd = $from.after(liDepth)
+  const prevLiInnerEnd = liStart - 1
+
+  const nestedNodes: any[] = []
+  for (let i = 1; i < liNode.childCount; i++) {
+    nestedNodes.push(liNode.child(i))
+  }
+
+  const tr = ed.state.tr
+  tr.delete(liStart, liEnd)
+
+  let insertPos = prevLiInnerEnd
+  for (const node of nestedNodes) {
+    tr.insert(insertPos, node)
+    insertPos += node.nodeSize
+  }
+
+  const cursorPos = Math.min(insertPos, tr.doc.content.size)
+  tr.setSelection(TextSelection.near(tr.doc.resolve(cursorPos)))
+
   event.preventDefault()
-  ed.chain().focus().liftListItem(itemType).run()
+  ed.view.dispatch(tr)
+  return true
+}
+
+// Tab inside the editor.
+//
+//   - In a table: pass through (prosemirror-tables handles cell nav).
+//   - In a list: sinkListItem (Tab) or liftListItem (Shift+Tab). Native
+//     primitives handle multi-line selections and refuse cleanly when the
+//     item is the first child of its list.
+//   - Elsewhere (plain paragraph, heading): indentBlock / outdentBlock
+//     via IndentExtension, which itself refuses to apply indent when any
+//     ancestor is a list item, so callers don't need to special-case it.
+function handleEditorTab(ed: any, event: KeyboardEvent): boolean {
+  if (ed.isActive('table')) return false
+
+  event.preventDefault()
+
+  const inList = findListItemAtCursor(ed.state)
+  if (inList) {
+    const { itemType } = inList
+    if (event.shiftKey) {
+      ed.chain().focus().liftListItem(itemType).run()
+    } else {
+      ed.chain().focus().sinkListItem(itemType).run()
+    }
+    return true
+  }
+
+  if (event.shiftKey) {
+    ed.chain().focus().outdentBlock().run()
+  } else {
+    ed.chain().focus().indentBlock().run()
+  }
   return true
 }
 
@@ -426,37 +471,9 @@ export function TiptapEditor({
       handleKeyDown: (_view, event) => {
         const ed = editorRef.current
         if (!ed) return false
-
-        if (event.key === 'Backspace') {
-          return handleListBackspace(ed, event)
-        }
-
-        if (event.key !== 'Tab') return false
-        if (ed.isActive('table')) return false
-
-        event.preventDefault()
-
-        const itemType = ed.isActive('taskItem')
-          ? 'taskItem'
-          : ed.isActive('listItem')
-            ? 'listItem'
-            : null
-
-        if (itemType) {
-          if (event.shiftKey) {
-            ed.chain().focus().liftListItem(itemType).run()
-          } else {
-            ed.chain().focus().sinkListItem(itemType).run()
-          }
-          return true
-        }
-
-        if (event.shiftKey) {
-          ed.chain().focus().outdentBlock().run()
-        } else {
-          ed.chain().focus().indentBlock().run()
-        }
-        return true
+        if (event.key === 'Backspace') return handleListBackspace(ed, event)
+        if (event.key === 'Tab') return handleEditorTab(ed, event)
+        return false
       },
     },
     onUpdate: ({ editor }) => {
