@@ -121,6 +121,7 @@ export function WhiteboardCanvas({ whiteboardId, initialData, readOnly }: Whiteb
         appState as Record<string, unknown>,
         files as Record<string, unknown>,
       )
+      if ((appState as any)?.editingElement != null) return
       const isDragging = (appState as { draggingElement?: unknown } | null)?.draggingElement != null
 
       // Strategy B — throttle during drag; immediate save when drag ends

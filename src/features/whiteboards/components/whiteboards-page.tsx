@@ -152,6 +152,7 @@ export function WhiteboardsPage({ initialWhiteboardId }: WhiteboardsPageProps = 
           />
           <div className="min-h-0 flex-1">
             <WhiteboardCanvas
+            key={sharedWhiteboard.id}
               whiteboardId={sharedWhiteboard.id}
               initialData={sharedWhiteboard.content}
               readOnly={sharedReadOnly}
@@ -184,6 +185,7 @@ export function WhiteboardsPage({ initialWhiteboardId }: WhiteboardsPageProps = 
         />
         <div className="min-h-0 flex-1">
           <WhiteboardCanvas
+            key={selectedWhiteboard.id}
             whiteboardId={selectedWhiteboard.id}
             initialData={selectedWhiteboard.content}
             readOnly={false}
