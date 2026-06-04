@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect } from 'react'
+import { Suspense, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'react-hot-toast'
 import { useAuthStore } from '@/lib/store'
 
-export default function AuthCallbackPage() {
+function AuthCallbackInner() {
   const router = useRouter()
   const params = useSearchParams()
   const setTokens = useAuthStore((s) => s.setTokens)
@@ -35,4 +35,14 @@ export default function AuthCallbackPage() {
   }, [params, router, setTokens, loadUser])
 
   return <div className="min-h-screen flex items-center justify-center">Signing you in…</div>
+}
+
+export default function AuthCallbackPage() {
+  return (
+    <Suspense
+      fallback={<div className="min-h-screen flex items-center justify-center">Signing you in…</div>}
+    >
+      <AuthCallbackInner />
+    </Suspense>
+  )
 }
