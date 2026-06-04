@@ -100,19 +100,67 @@ export function useUpdateWhiteboardMutation() {
     },
     onMutate: async ({ id, data }) => {
       await queryClient.cancelQueries({ queryKey: WHITEBOARDS_QUERY_KEY })
-      const previous = queryClient.getQueryData<Whiteboard[]>(WHITEBOARDS_QUERY_KEY)
+      const detailKey = [...WHITEBOARDS_QUERY_KEY, id] as const
+      const previousList = queryClient.getQueryData<Whiteboard[]>(WHITEBOARDS_QUERY_KEY)
+      const previousDetail = queryClient.getQueryData<{ whiteboard: Whiteboard; readOnly: boolean }>(
+        detailKey,
+      )
+      const previousShared = queryClient.getQueryData<SharedWithMeItem[]>(SHARED_WHITEBOARDS_QUERY_KEY)
+
       queryClient.setQueryData<Whiteboard[]>(WHITEBOARDS_QUERY_KEY, (prev) => {
         if (!prev) return prev
         return prev.map((w) => (w.id === id ? { ...w, ...data } : w))
       })
-      return { previous }
+
+      queryClient.setQueryData<{ whiteboard: Whiteboard; readOnly: boolean }>(detailKey, (prev) => {
+        if (!prev) return prev
+        return { ...prev, whiteboard: { ...prev.whiteboard, ...data } }
+      })
+
+      if (data.title !== undefined || data.icon !== undefined || data.color !== undefined) {
+        queryClient.setQueryData<SharedWithMeItem[]>(SHARED_WHITEBOARDS_QUERY_KEY, (prev) => {
+          if (!prev) return prev
+          return prev.map((item) =>
+            item.whiteboard.id === id
+              ? {
+                  ...item,
+                  whiteboard: {
+                    ...item.whiteboard,
+                    ...(data.title !== undefined ? { title: data.title } : {}),
+                    ...(data.icon !== undefined ? { icon: data.icon } : {}),
+                    ...(data.color !== undefined ? { color: data.color } : {}),
+                  },
+                }
+              : item,
+          )
+        })
+      }
+
+      return { previousList, previousDetail, previousShared, id }
     },
-    onError: (error: any, _vars, context) => {
-      if (context?.previous) queryClient.setQueryData(WHITEBOARDS_QUERY_KEY, context.previous)
+    onError: (error: any, { id }, context) => {
+      if (context?.previousList) {
+        queryClient.setQueryData(WHITEBOARDS_QUERY_KEY, context.previousList)
+      }
+      if (context?.previousDetail) {
+        queryClient.setQueryData([...WHITEBOARDS_QUERY_KEY, id], context.previousDetail)
+      }
+      if (context?.previousShared) {
+        queryClient.setQueryData(SHARED_WHITEBOARDS_QUERY_KEY, context.previousShared)
+      }
       toast.error(error.response?.data?.message || 'Failed to update whiteboard')
     },
-    onSettled: () => {
+    onSettled: (_data, _error, { id }) => {
+      // Defer refetch while queries are active — avoids Excalidraw onChange loops.
       queryClient.invalidateQueries({ queryKey: WHITEBOARDS_QUERY_KEY, refetchType: 'inactive' })
+      queryClient.invalidateQueries({
+        queryKey: [...WHITEBOARDS_QUERY_KEY, id],
+        refetchType: 'inactive',
+      })
+      queryClient.invalidateQueries({
+        queryKey: SHARED_WHITEBOARDS_QUERY_KEY,
+        refetchType: 'inactive',
+      })
     },
   })
 }

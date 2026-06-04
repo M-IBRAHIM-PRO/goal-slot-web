@@ -1,4 +1,14 @@
+import axios from 'axios'
+
 import { api } from '@/lib/api'
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL
+
+/** Public endpoints — no auth header or 401 refresh interceptor. */
+const publicApi = axios.create({
+  baseURL: `${API_URL}/api`,
+  headers: { 'Content-Type': 'application/json' },
+})
 
 import type {
   ExcalidrawScene,
@@ -97,5 +107,5 @@ export const whiteboardsApi = {
 }
 
 export const publicWhiteboardsApi = {
-  getByToken: (token: string) => api.get(`/public/whiteboards/${token}`),
+  getByToken: (token: string) => publicApi.get(`/public/whiteboards/${token}`),
 }

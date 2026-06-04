@@ -24,12 +24,23 @@ export function useWhiteboardsSelection({ initialWhiteboardId }: UseWhiteboardsS
 
   useEffect(() => {
     if (isLoading) return
-    if (selectedWhiteboardId) {
+
+    const paramId = searchParams.get('whiteboardId')
+    const hasSelectedWhiteboard =
+      !!selectedWhiteboardId && whiteboards.some((w) => w.id === selectedWhiteboardId)
+
+    if (paramId && paramId !== selectedWhiteboardId && whiteboards.some((w) => w.id === paramId)) {
+      setSelectedWhiteboardId(paramId)
+      if (typeof window !== 'undefined') window.localStorage.setItem(LAST_WHITEBOARD_KEY, paramId)
       if (!hasInitialized) setHasInitialized(true)
       return
     }
 
-    const paramId = searchParams.get('whiteboardId')
+    if (hasSelectedWhiteboard) {
+      if (!hasInitialized) setHasInitialized(true)
+      return
+    }
+
     let idToSelect: string | undefined
 
     if (paramId && whiteboards.some((w) => w.id === paramId)) idToSelect = paramId
@@ -90,15 +101,15 @@ export function useWhiteboardsSelection({ initialWhiteboardId }: UseWhiteboardsS
     )
   }, [createMutation, selectWhiteboard])
 
+  /** Clears selection after the active whiteboard was deleted elsewhere (e.g. sidebar). */
   const deleteSelectedWhiteboard = useCallback(() => {
-    if (whiteboards.length > 1) {
-      const next = whiteboards.find((w) => w.id !== selectedWhiteboardId)
-      if (next) {
-        selectWhiteboard(next)
-        return
-      }
+    const next = whiteboards.find((w) => w.id !== selectedWhiteboardId) ?? null
+    if (next) {
+      selectWhiteboard(next)
+      return
     }
     setSelectedWhiteboardId(null)
+    if (typeof window !== 'undefined') window.localStorage.removeItem(LAST_WHITEBOARD_KEY)
     router.replace(pathname)
   }, [whiteboards, pathname, router, selectWhiteboard, selectedWhiteboardId])
 

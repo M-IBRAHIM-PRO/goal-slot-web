@@ -62,9 +62,9 @@ export function WhiteboardHeader({
   }, [autoFocusTitle, readOnly, whiteboard.id])
 
   const saveTitle = useCallback(
-    (newTitle: string) => {
-      if (newTitle !== whiteboard.title) {
-        updateMutation.mutate({ id: idRef.current, data: { title: newTitle } })
+    (newTitle: string, expectedId: string) => {
+      if (newTitle !== whiteboard.title && idRef.current === expectedId) {
+        updateMutation.mutate({ id: expectedId, data: { title: newTitle } })
       }
     },
     [whiteboard.title, updateMutation],
@@ -81,8 +81,9 @@ export function WhiteboardHeader({
           type="text"
           value={title}
           onChange={(e) => {
-            setTitle(e.target.value)
-            debouncedSaveTitle(e.target.value)
+            const next = e.target.value
+            setTitle(next)
+            debouncedSaveTitle(next, whiteboard.id)
           }}
           placeholder="Untitled"
           readOnly={readOnly}

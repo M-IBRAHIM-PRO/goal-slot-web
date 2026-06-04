@@ -1,41 +1,19 @@
 'use client'
 
-// @ts-ignore: side-effect import of CSS - project has no global CSS type declarations
-import '@excalidraw/excalidraw/index.css'
-
-import type React from 'react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { usePathname } from 'next/navigation'
+import { useQueryClient } from '@tanstack/react-query'
 
 import { updateWhiteboard } from '@/lib/api/whiteboards'
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/hooks/use-mobile'
 
-import type { ExcalidrawScene } from './types'
+import { WHITEBOARDS_QUERY_KEY } from './hooks/use-whiteboards'
+import type { ExcalidrawScene, Whiteboard } from './types'
 
-const ExcalidrawBundle = dynamic(
-  () =>
-    import('@excalidraw/excalidraw').then(({ Excalidraw, MainMenu }) => {
-      function ExcalidrawWithMenu(props: React.ComponentProps<typeof Excalidraw>) {
-        const { children: _ignored, ...rest } = props
-        return (
-          <Excalidraw {...rest}>
-            <MainMenu>
-              <MainMenu.DefaultItems.Export />
-              <MainMenu.DefaultItems.SaveAsImage />
-              <MainMenu.DefaultItems.SearchMenu />
-              <MainMenu.DefaultItems.Help />
-              <MainMenu.DefaultItems.ClearCanvas />
-              <MainMenu.Separator />
-              <MainMenu.DefaultItems.ToggleTheme />
-              <MainMenu.DefaultItems.ChangeCanvasBackground />
-            </MainMenu>
-          </Excalidraw>
-        )
-      }
-      return ExcalidrawWithMenu
-    }),
+const ExcalidrawCanvasInner = dynamic(
+  () => import('./excalidraw-canvas-inner').then((mod) => mod.ExcalidrawCanvasInner),
   {
     ssr: false,
     loading: () => <div className="flex h-full items-center justify-center">Loading canvas...</div>,
@@ -50,24 +28,73 @@ interface WhiteboardCanvasProps {
   readOnly: boolean
 }
 
+interface ExcalidrawAppStateSlice {
+  editingElement?: unknown
+  draggingElement?: unknown
+}
+
+function hasEditingElement(appState: unknown): boolean {
+  return (
+    typeof appState === 'object' &&
+    appState !== null &&
+    'editingElement' in appState &&
+    (appState as ExcalidrawAppStateSlice).editingElement != null
+  )
+}
+
 function buildScene(
   elements: readonly Record<string, unknown>[],
   appState: Record<string, unknown>,
   files: Record<string, unknown>,
 ): ExcalidrawScene {
+  const {
+    collaborators: _c,
+    editingElement: _e,
+    draggingElement: _d,
+    openMenu: _m,
+    openPopup: _p,
+    contextMenu: _ctx,
+    ...persistedAppState
+  } = appState
+
   return {
     elements: elements as Record<string, unknown>[],
-    appState,
+    appState: persistedAppState,
     files,
   }
 }
 
-export function WhiteboardCanvas({ whiteboardId, initialData, readOnly }: WhiteboardCanvasProps) {
+function toInitialData(initialData: ExcalidrawScene | null) {
+  if (!initialData) {
+    return {
+      elements: [],
+      appState: { collaborators: new Map() },
+      files: {},
+    }
+  }
+  return {
+    elements: initialData.elements as any,
+    appState: {
+      ...initialData.appState,
+      collaborators: new Map(),
+    },
+    files: (initialData.files ?? {}) as any,
+  }
+}
+
+const UI_OPTIONS = {
+  canvasActions: {
+    loadScene: false,
+    saveToActiveFile: false,
+  },
+} as const
+
+function WhiteboardCanvasComponent({ whiteboardId, initialData, readOnly }: WhiteboardCanvasProps) {
   const isMobile = useIsMobile()
   const pathname = usePathname()
   const forceViewOnly = isMobile && !readOnly
+  const queryClient = useQueryClient()
 
-  const [excalidrawAPI, setExcalidrawAPI] = useState<any>(null)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -76,90 +103,133 @@ export function WhiteboardCanvas({ whiteboardId, initialData, readOnly }: Whiteb
   const savedHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const whiteboardIdRef = useRef(whiteboardId)
   const readOnlyRef = useRef(readOnly || forceViewOnly)
+  const excalidrawAPIRef = useRef<any>(null)
+  const isReadyRef = useRef(false)
+  const lastPersistedHashRef = useRef<string | null>(null)
 
-  // Fix: update refs inside useEffect, not during render
   useEffect(() => {
     whiteboardIdRef.current = whiteboardId
+    isReadyRef.current = false
+    lastPersistedHashRef.current = null
   }, [whiteboardId])
 
   useEffect(() => {
     readOnlyRef.current = readOnly || forceViewOnly
   }, [readOnly, forceViewOnly])
 
-  const persistScene = useCallback(async (scene: ExcalidrawScene, options?: { silent?: boolean }) => {
-    if (readOnlyRef.current) return
-    if (!options?.silent) setSaveStatus('saving')
-    try {
-      await updateWhiteboard(whiteboardIdRef.current, { content: scene })
-      if (!options?.silent) {
-        setSaveStatus('saved')
-        if (savedHideTimerRef.current) clearTimeout(savedHideTimerRef.current)
-        savedHideTimerRef.current = setTimeout(() => setSaveStatus('idle'), 2000)
-      }
-    } catch {
-      if (!options?.silent) setSaveStatus('error')
-    }
+  const handleExcalidrawAPI = useCallback((api: any) => {
+    excalidrawAPIRef.current = api
+    requestAnimationFrame(() => {
+      isReadyRef.current = true
+    })
   }, [])
 
-  const saveFromApi = useCallback(
-    (options?: { silent?: boolean }) => {
-      if (!excalidrawAPI || readOnlyRef.current) return
-      const elements = excalidrawAPI.getSceneElements()
-      const appState = excalidrawAPI.getAppState()
-      const files = excalidrawAPI.getFiles()
-      void persistScene(buildScene(elements, appState, files), options)
+  const excalidrawInitialData = useMemo(() => toInitialData(initialData), [whiteboardId])
+
+  const patchListCache = useCallback(
+    (targetId: string, scene: ExcalidrawScene) => {
+      queryClient.setQueryData<Whiteboard[]>(WHITEBOARDS_QUERY_KEY, (prev) => {
+        if (!prev) return prev
+        return prev.map((w) => (w.id === targetId ? { ...w, content: scene } : w))
+      })
     },
-    [excalidrawAPI, persistScene],
+    [queryClient],
+  )
+
+  const persistScene = useCallback(
+    async (scene: ExcalidrawScene, targetId: string, options?: { silent?: boolean }) => {
+      if (readOnlyRef.current) return
+
+      const hash = JSON.stringify(scene)
+      if (hash === lastPersistedHashRef.current) return
+
+      if (!options?.silent) setSaveStatus('saving')
+      try {
+        await updateWhiteboard(targetId, { content: scene })
+        lastPersistedHashRef.current = hash
+        patchListCache(targetId, scene)
+        if (!options?.silent) {
+          setSaveStatus('saved')
+          if (savedHideTimerRef.current) clearTimeout(savedHideTimerRef.current)
+          savedHideTimerRef.current = setTimeout(() => setSaveStatus('idle'), 2000)
+        }
+      } catch {
+        if (!options?.silent) setSaveStatus('error')
+      }
+    },
+    [patchListCache],
+  )
+
+  const saveFromApi = useCallback(
+    (targetId: string, options?: { silent?: boolean }) => {
+      const api = excalidrawAPIRef.current
+      if (!api || readOnlyRef.current) return
+      const elements = api.getSceneElements()
+      const appState = api.getAppState()
+      const files = api.getFiles()
+      void persistScene(buildScene(elements, appState, files), targetId, options)
+    },
+    [persistScene],
   )
 
   const handleChange = useCallback(
     (elements: readonly unknown[], appState: unknown, files: unknown) => {
-      if (readOnlyRef.current) return
+      if (!isReadyRef.current || readOnlyRef.current) return
+      if (hasEditingElement(appState)) return
 
       const scene = buildScene(
         elements as Record<string, unknown>[],
         appState as Record<string, unknown>,
         files as Record<string, unknown>,
       )
-      if ((appState as any)?.editingElement != null) return
-      const isDragging = (appState as { draggingElement?: unknown } | null)?.draggingElement != null
 
-      // Strategy B — throttle during drag; immediate save when drag ends
+      const isDragging =
+        typeof appState === 'object' &&
+        appState !== null &&
+        'draggingElement' in appState &&
+        (appState as ExcalidrawAppStateSlice).draggingElement != null
+
       if (isDragging) {
         if (Date.now() - lastSaveRef.current > 1000) {
           lastSaveRef.current = Date.now()
-          void persistScene(scene)
+          void persistScene(scene, whiteboardIdRef.current)
         }
         wasDraggingRef.current = true
       } else if (wasDraggingRef.current) {
         wasDraggingRef.current = false
         lastSaveRef.current = Date.now()
-        void persistScene(scene)
+        void persistScene(scene, whiteboardIdRef.current)
+        if (debounceRef.current) {
+          clearTimeout(debounceRef.current)
+          debounceRef.current = null
+        }
       }
 
-      // Strategy A — debounced autosave (1s)
       if (debounceRef.current) clearTimeout(debounceRef.current)
       debounceRef.current = setTimeout(() => {
-        void persistScene(scene)
+        void persistScene(scene, whiteboardIdRef.current)
       }, 1000)
     },
     [persistScene],
   )
 
-  // Strategy C — save on close / navigate
   useEffect(() => {
-    const saveImmediately = () => saveFromApi({ silent: true })
-    window.addEventListener('beforeunload', saveImmediately)
+    const idAtMount = whiteboardId
     return () => {
-      window.removeEventListener('beforeunload', saveImmediately)
-      saveImmediately()
+      saveFromApi(idAtMount, { silent: true })
     }
+  }, [whiteboardId, saveFromApi])
+
+  useEffect(() => {
+    const saveImmediately = () => saveFromApi(whiteboardIdRef.current, { silent: true })
+    window.addEventListener('beforeunload', saveImmediately)
+    return () => window.removeEventListener('beforeunload', saveImmediately)
   }, [saveFromApi])
 
   const prevPathRef = useRef(pathname)
   useEffect(() => {
     if (prevPathRef.current !== pathname) {
-      saveFromApi({ silent: true })
+      saveFromApi(whiteboardIdRef.current, { silent: true })
       prevPathRef.current = pathname
     }
   }, [pathname, saveFromApi])
@@ -194,31 +264,12 @@ export function WhiteboardCanvas({ whiteboardId, initialData, readOnly }: Whiteb
         </div>
       )}
 
-      <div className="min-h-0 flex-1">
-        <ExcalidrawBundle
-          excalidrawAPI={(api: any) => setExcalidrawAPI(api)}
-          UIOptions={{
-            canvasActions: {
-              loadScene: false,
-              saveToActiveFile: false,
-            },
-          }}
-          initialData={
-            initialData
-              ? {
-                  elements: initialData.elements as any,
-                  appState: {
-                    ...initialData.appState,
-                    collaborators: new Map(),
-                  },
-                  files: initialData.files as any,
-                }
-              : {
-                  elements: [],
-                  appState: { collaborators: new Map() },
-                  files: {},
-                }
-          }
+      <div className="goalslot-whiteboard-canvas min-h-0 flex-1">
+        <ExcalidrawCanvasInner
+          key={whiteboardId}
+          excalidrawAPI={handleExcalidrawAPI}
+          UIOptions={UI_OPTIONS}
+          initialData={excalidrawInitialData}
           onChange={handleChange}
           viewModeEnabled={readOnly || forceViewOnly}
         />
@@ -226,3 +277,9 @@ export function WhiteboardCanvas({ whiteboardId, initialData, readOnly }: Whiteb
     </div>
   )
 }
+
+/** Ignore cache-driven initialData updates while the same board is open. */
+export const WhiteboardCanvas = memo(
+  WhiteboardCanvasComponent,
+  (prev, next) => prev.whiteboardId === next.whiteboardId && prev.readOnly === next.readOnly,
+)
