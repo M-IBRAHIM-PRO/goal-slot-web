@@ -2,6 +2,7 @@
 
 import { useRef, useState, type PointerEvent } from 'react'
 
+import { ExternalEventItem, useExternalWeekEvents } from '@/features/calendar'
 import { ScheduleEmptyState } from '@/features/schedule/components/schedule-empty-state'
 import { DayColumn } from '@/features/schedule/components/schedule-grid/day-column'
 import { DraftBlock } from '@/features/schedule/components/schedule-grid/draft-block'
@@ -35,6 +36,9 @@ export function ScheduleGrid({
 }: ScheduleGridProps) {
   const { activeId, preview, pendingDraft, setPendingDraft, handleDragStart, handleDragMove, handleDragEnd } =
     useScheduleDrag({ weekSchedule, draftKey })
+  // Read-only Google Calendar events for the current week, mapped onto the
+  // grid's day columns. Empty unless an account is connected.
+  const { eventsByDay, hasEvents } = useExternalWeekEvents()
   const [draftSelection, setDraftSelection] = useState<DraftSelection | null>(null)
   const [isCreating, setIsCreating] = useState(false)
   const pointerColumnRef = useRef<number | null>(null)
@@ -167,6 +171,9 @@ export function ScheduleGrid({
                   onPointerMove={handlePointerMove}
                   onPointerUp={handlePointerUp}
                 >
+                  {(eventsByDay[dayOfWeek] || []).map((event) => (
+                    <ExternalEventItem key={event.id} event={event} />
+                  ))}
                   {(weekSchedule[dayOfWeek] || []).map((block) => renderBlock(block))}
                   {preview && preview.dayOfWeek === dayOfWeek && activeId && <DraftBlock selection={preview} />}
                   {draftSelection && draftSelection.dayOfWeek === dayOfWeek && (
@@ -179,6 +186,19 @@ export function ScheduleGrid({
           </div>
         </ScheduleGridDragLayer>
       </div>
+
+      {hasEvents && (
+        <div className="flex items-center gap-2 px-3 py-2 text-[11px] text-zinc-500">
+          <span
+            className="h-3 w-4 rounded-sm border border-dashed border-slate-400"
+            style={{
+              backgroundImage:
+                'repeating-linear-gradient(45deg, #94a3b81a, #94a3b81a 4px, transparent 4px, transparent 8px)',
+            }}
+          />
+          Google Calendar events (read-only, this week)
+        </div>
+      )}
     </div>
   )
 }

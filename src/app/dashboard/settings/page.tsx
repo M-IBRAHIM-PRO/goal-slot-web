@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 import { CategoryManagement } from '@/features/categories/components/category-management'
@@ -52,6 +52,26 @@ export default function SettingsPage() {
     // Update URL query parameter without scrolling - component will re-render with new activeTab
     router.replace(`/dashboard/settings?tab=${tabId}`, { scroll: false })
   }
+
+  // Handle the Google Calendar OAuth return. The API callback redirects here
+  // with ?google=connected|error (and an optional &reason=). Surface a toast,
+  // land the user on the Integrations tab, and strip the params so a refresh
+  // does not re-fire the toast.
+  const googleStatus = searchParams.get('google')
+  useEffect(() => {
+    if (!googleStatus) return
+    if (googleStatus === 'connected') {
+      toast.success('Google Calendar connected')
+    } else {
+      const reason = searchParams.get('reason')
+      toast.error(
+        reason === 'already_connected'
+          ? 'A different Google account is already connected. Disconnect it first.'
+          : 'Could not connect Google Calendar. Please try again.',
+      )
+    }
+    router.replace('/dashboard/settings?tab=integrations', { scroll: false })
+  }, [googleStatus, router, searchParams])
 
   const handleLogout = () => {
     logout()

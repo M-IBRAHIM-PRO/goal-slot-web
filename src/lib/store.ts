@@ -1,7 +1,18 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-import { authApi } from '@/lib/api'
+import { authApi, usersApi } from '@/lib/api'
+
+// IANA zone for the current browser, e.g. "Asia/Karachi". Used to populate
+// User.timezone (Calendar push, Coach "today"/"this week"). Falsy in the rare
+// environment without Intl resolved options.
+function browserTimezone(): string | undefined {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined
+  } catch {
+    return undefined
+  }
+}
 
 export interface User {
   id: string
@@ -14,6 +25,8 @@ export interface User {
   unlimitedAccess: boolean
   subscriptionStatus?: string
   subscriptionEndDate?: string | null
+  // IANA timezone persisted server-side (added in the Calendar sync PR1).
+  timezone?: string | null
   preferences?: {
     timezone?: string
     [key: string]: any
@@ -74,7 +87,7 @@ export const useAuthStore = create<AuthState>()(
       register: async (email, password, name, otp) => {
         set({ isLoading: true })
         try {
-          const { data } = await authApi.register({ email, password, name, otp })
+          const { data } = await authApi.register({ email, password, name, otp, timezone: browserTimezone() })
           get().setTokens(data.accessToken, data.refreshToken)
           set({ user: data.user, isAuthenticated: true, isLoading: false })
         } catch (error) {
@@ -116,6 +129,19 @@ export const useAuthStore = create<AuthState>()(
         try {
           const { data } = await authApi.getProfile()
           set({ user: data, isAuthenticated: true, isLoading: false })
+
+          // Backfill the persisted timezone from the browser on every /auth/me
+          // refresh. Existing rows seed to UTC server-side; this corrects them
+          // to the user's real zone and keeps it current if they travel.
+          const tz = browserTimezone()
+          if (tz && data.timezone !== tz) {
+            try {
+              const res = await usersApi.updateProfile({ timezone: tz })
+              set({ user: res.data })
+            } catch {
+              // Best-effort — a failed tz backfill must not block sign-in.
+            }
+          }
         } catch {
           get().logout()
           set({ isLoading: false })

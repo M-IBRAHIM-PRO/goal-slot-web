@@ -180,7 +180,8 @@ export const authApi = {
     api.post('/auth/verify-otp', data),
   forgotPassword: (data: { email: string }) => api.post('/auth/forgot-password', data),
   resetPassword: (data: { email: string; otp: string; newPassword: string }) => api.post('/auth/reset-password', data),
-  register: (data: { email: string; password: string; name: string; otp: string }) => api.post('/auth/register', data),
+  register: (data: { email: string; password: string; name: string; otp: string; timezone?: string }) =>
+    api.post('/auth/register', data),
   login: (data: { email: string; password: string }) => api.post('/auth/login', data),
   ssoLogin: (data: { token: string; email: string; name?: string }) => api.post('/auth/sso', data),
   getProfile: () => api.get('/auth/me'),
@@ -232,6 +233,62 @@ export const scheduleApi = {
   create: (data: any) => api.post('/schedule', data),
   update: (id: string, data: any) => api.put(`/schedule/${id}`, data),
   delete: (id: string) => api.delete(`/schedule/${id}`),
+}
+
+// Google Calendar integration API (PR1: OAuth connect + read-only sync)
+//
+// Backend contract lives in goal-slot-api under /api/integrations/google/*.
+// The consent URL is built server-side, so the web side just opens whatever
+// `getConsentUrl()` returns. Selections + events are date-anchored; the
+// schedule grid maps them onto the current week client-side.
+export type CalendarSyncDirection = 'in' | 'out' | 'both'
+
+export interface CalendarSelectionInput {
+  externalCalId: string
+  displayName: string
+  color?: string | null
+  syncDirection: CalendarSyncDirection
+}
+
+export interface GoogleCalendarConnectionDto {
+  connected: boolean
+  accountEmail: string | null
+  // null when not connected; "stale" means the grant was revoked and the
+  // user has to reconnect (surfaced in the Settings card).
+  status: 'active' | 'stale' | null
+  scopes?: string[]
+  // Calendars the user has already chosen, used to prefill the picker.
+  selections?: CalendarSelectionInput[]
+}
+
+export interface GoogleCalendarDto {
+  id: string // externalCalId
+  name: string
+  color: string | null
+  primary?: boolean
+}
+
+export interface ExternalEventDto {
+  id: string
+  title: string
+  startsAt: string // ISO 8601
+  endsAt: string // ISO 8601
+  isAllDay: boolean
+  status: string // confirmed | tentative | cancelled
+  calendarName: string
+  color: string | null
+}
+
+export const calendarApi = {
+  getConnection: () => api.get<GoogleCalendarConnectionDto>('/integrations/google'),
+  getConsentUrl: () => api.get<{ url: string }>('/integrations/google/connect'),
+  listCalendars: () => api.get<GoogleCalendarDto[]>('/integrations/google/calendars'),
+  saveSelections: (selections: CalendarSelectionInput[]) =>
+    api.put('/integrations/google/selections', { selections }),
+  sync: () => api.post('/integrations/google/sync'),
+  disconnect: () => api.delete('/integrations/google'),
+  getEvents: (from: string, to: string) =>
+    api.get<ExternalEventDto[]>('/integrations/google/events', { params: { from, to } }),
 }
 
 // Reports API
@@ -354,7 +411,7 @@ export const stripeApi = {
 // Users API (Admin)
 export const usersApi = {
   getProfile: () => api.get('/users/profile'),
-  updateProfile: (data: { name?: string; avatar?: string }) => api.put('/users/profile', data),
+  updateProfile: (data: { name?: string; avatar?: string; timezone?: string }) => api.put('/users/profile', data),
   changePassword: (currentPassword: string, newPassword: string) =>
     api.put('/users/password', { currentPassword, newPassword }),
   deleteAccount: () => api.delete('/users/account'),

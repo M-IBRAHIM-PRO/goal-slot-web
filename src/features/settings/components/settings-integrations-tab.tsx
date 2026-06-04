@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 
+import { GoogleCalendarCard } from '@/features/calendar'
 import { ByokProvider, PROVIDER_META, useByokKey } from '@/features/settings/hooks/use-byok-key'
 import { KeyRound, Trash2 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
@@ -97,6 +98,8 @@ export function SettingsIntegrationsTab() {
 
   return (
     <div className="space-y-6">
+      <GoogleCalendarCard />
+
       <GlassCard padded>
         <SectionHeader
           title={
