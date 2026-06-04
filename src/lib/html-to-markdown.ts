@@ -1,5 +1,7 @@
 import TurndownService from 'turndown'
 
+import { toISOString } from './utils'
+
 function createTurndown() {
   // Keep output predictable and broadly compatible with common Markdown renderers.
   const td = new TurndownService({
@@ -41,14 +43,15 @@ export function htmlToMarkdown(html: string): string {
   return td.turndown(html).trim()
 }
 
-export function slugifyFilename(value: string): string {
-  return value
-    .toLowerCase()
-    .trim()
-    .replace(/[\s_]+/g, '-')
-    .replace(/[^\w-]/g, '')
-    .replace(/--+/g, '-')
-    .replace(/^-+|-+$/g, '')
+function slugifyFilename(value: string): string {
+  return (
+    value
+      .normalize('NFKD')
+      .replace(/[̀-ͯ]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'note'
+  )
 }
 
 interface NoteFrontmatterInput {
@@ -58,12 +61,13 @@ interface NoteFrontmatterInput {
 }
 
 function escapeYamlString(value: string): string {
-  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r')
+  return value.replace(/\//g, '\\/').replace(/"/g, '\\"').replace(/\n/g, '\n').replace(/\r/g, '\r')
 }
 
 export function buildNoteMarkdown(note: NoteFrontmatterInput, html: string): string {
-  const created = new Date(note.createdAt).toISOString()
-  const updated = new Date(note.updatedAt).toISOString()
+  const created = toISOString(note.createdAt)
+  const updated = toISOString(note.updatedAt)
+
   const title = note.title?.trim() || 'Untitled'
   const frontmatter = `---\ntitle: "${escapeYamlString(title)}"\ncreated: ${created}\nupdated: ${updated}\n---\n\n`
   const body = htmlToMarkdown(html)
