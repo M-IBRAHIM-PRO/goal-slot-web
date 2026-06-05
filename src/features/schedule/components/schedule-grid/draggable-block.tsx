@@ -74,9 +74,14 @@ export function DraggableBlock({ block, top, height, isActiveDrag, onEdit, onVie
   const blockStyle: CSSProperties = {
     backgroundColor: `${accentColor}1a`,
     borderLeftColor: accentColor,
-    top,
-    height,
-    minHeight: height,
+    top: top + 1,
+    // Shave 2px off the height (1 on top via the top offset above, 1 on
+    // bottom here) so back-to-back blocks have a visible 2px gap between
+    // them. Otherwise adjacent same-hue blocks (e.g. tech → engineering
+    // both in the blue family) read as one continuous strip. The block's
+    // logical time span is unchanged; only the visual is inset.
+    height: Math.max(height - 2, 8),
+    minHeight: Math.max(height - 2, 8),
     zIndex: 10,
     transform: !isActiveDrag && transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
     opacity: isActiveDrag ? 0 : isDragging ? 0.7 : 1,
@@ -125,7 +130,7 @@ export function DraggableBlock({ block, top, height, isActiveDrag, onEdit, onVie
           </div>
 
           {block.goal && (
-            <div className="mt-0.5 flex shrink-0 items-center gap-0.5 text-[9px] font-semibold uppercase leading-tight">
+            <div className="mt-0.5 flex shrink-0 items-center gap-0.5 text-xs font-semibold uppercase leading-tight">
               <Target className="h-2.5 w-2.5 shrink-0" />
               <span className="truncate">{block.goal.title}</span>
             </div>

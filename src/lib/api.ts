@@ -233,6 +233,7 @@ export const scheduleApi = {
   create: (data: any) => api.post('/schedule', data),
   update: (id: string, data: any) => api.put(`/schedule/${id}`, data),
   delete: (id: string) => api.delete(`/schedule/${id}`),
+  clearAll: () => api.delete<{ deleted: number }>('/schedule'),
 }
 
 // Google Calendar integration API (PR1: OAuth connect + read-only sync)
