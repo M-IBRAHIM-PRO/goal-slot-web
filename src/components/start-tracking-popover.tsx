@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 import { useTimerStore } from '@/lib/use-timer-store'
 import { ChevronDown, Loader2, Play, Plus, Search, X } from 'lucide-react'
@@ -33,16 +34,29 @@ interface GoalAutocompleteProps {
   onChange: (id: string) => void
   goals: GoalLite[]
   activeBlockGoalId?: string | null
+  // Externally-owned ref so the parent popover's outside-click dismiss can
+  // treat the portalled panel as "inside" and not close the whole popover
+  // when the user clicks on a goal.
+  panelRef: React.MutableRefObject<HTMLDivElement | null>
 }
 
 // Small inline autocomplete used for picking a goal in the "create task"
 // row. Replaces the native <select> so users can type instead of scrolling
-// through every goal on the account. Keeps focus management self-contained,
-// closes on outside click and on Escape.
-function GoalAutocomplete({ value, onChange, goals, activeBlockGoalId }: GoalAutocompleteProps) {
+// through every goal on the account. The dropdown panel is portalled to
+// document.body and positioned with fixed coordinates because the parent
+// popover uses `overflow-hidden` and the results list uses `overflow-y-auto`,
+// either of which would clip an absolutely-positioned dropdown.
+function GoalAutocomplete({
+  value,
+  onChange,
+  goals,
+  activeBlockGoalId,
+  panelRef,
+}: GoalAutocompleteProps) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
-  const wrapperRef = useRef<HTMLDivElement | null>(null)
+  const buttonRef = useRef<HTMLButtonElement | null>(null)
+  const [panelPos, setPanelPos] = useState<{ top: number; left: number } | null>(null)
 
   const displayName =
     value === NO_GOAL ? 'No goal' : goals.find((g) => g.id === value)?.title || 'No goal'
@@ -54,11 +68,38 @@ function GoalAutocomplete({ value, onChange, goals, activeBlockGoalId }: GoalAut
     return all.filter((g) => g.title.toLowerCase().includes(q))
   }, [goals, search])
 
+  // Position the dropdown above the button (the popover lives near the
+  // bottom-right of the viewport so up is the safe direction). Recomputes
+  // on open and on window scroll/resize.
+  useLayoutEffect(() => {
+    if (!open) return
+    const computePosition = () => {
+      const btn = buttonRef.current
+      if (!btn) return
+      const rect = btn.getBoundingClientRect()
+      const panelWidth = 224 // matches w-56 below
+      const estimatedPanelHeight = 220 // search input + ~5 rows; fine for non-overlap math
+      const left = Math.max(8, Math.min(window.innerWidth - panelWidth - 8, rect.right - panelWidth))
+      const top = Math.max(8, rect.top - estimatedPanelHeight - 4)
+      setPanelPos({ top, left })
+    }
+    computePosition()
+    window.addEventListener('scroll', computePosition, true)
+    window.addEventListener('resize', computePosition)
+    return () => {
+      window.removeEventListener('scroll', computePosition, true)
+      window.removeEventListener('resize', computePosition)
+    }
+  }, [open])
+
+  // Close on outside click. Both the trigger button and the portalled
+  // panel count as "inside" so clicks inside the panel do not close it.
   useEffect(() => {
     if (!open) return
     const onDocPointer = (e: PointerEvent) => {
-      if (!wrapperRef.current) return
-      if (wrapperRef.current.contains(e.target as Node)) return
+      const target = e.target as Node
+      if (buttonRef.current?.contains(target)) return
+      if (panelRef.current?.contains(target)) return
       setOpen(false)
       setSearch('')
     }
@@ -66,9 +107,74 @@ function GoalAutocomplete({ value, onChange, goals, activeBlockGoalId }: GoalAut
     return () => document.removeEventListener('pointerdown', onDocPointer)
   }, [open])
 
+  const panel =
+    open && panelPos && typeof document !== 'undefined'
+      ? createPortal(
+          <div
+            ref={panelRef}
+            style={{ top: panelPos.top, left: panelPos.left, width: 224 }}
+            className="fixed z-[60] overflow-hidden rounded-md border border-zinc-200 bg-white shadow-lg"
+          >
+            <div className="border-b border-zinc-100 p-1.5">
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    e.preventDefault()
+                    setOpen(false)
+                    setSearch('')
+                  }
+                }}
+                placeholder="Search goals..."
+                autoFocus
+                className="h-7 w-full rounded border border-zinc-200 bg-white px-2 text-[11px] text-zinc-900 placeholder:text-zinc-400 focus:border-[#f2cc0d] focus:outline-none focus:ring-1 focus:ring-[#f2cc0d]"
+              />
+            </div>
+            <ul className="max-h-44 overflow-y-auto py-1">
+              {items.length === 0 ? (
+                <li className="px-2.5 py-1.5 text-[11px] text-zinc-400">No goals match</li>
+              ) : (
+                items.map((g) => {
+                  const isOnNow = g.id !== NO_GOAL && g.id === activeBlockGoalId
+                  const isSelected = g.id === value
+                  return (
+                    <li key={g.id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onChange(g.id)
+                          setOpen(false)
+                          setSearch('')
+                        }}
+                        className={`flex w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left text-[11px] transition-colors ${
+                          isSelected
+                            ? 'bg-[#fff7d1] text-zinc-900'
+                            : 'text-zinc-700 hover:bg-zinc-50'
+                        }`}
+                      >
+                        <span className="truncate">{g.title}</span>
+                        {isOnNow && (
+                          <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-700">
+                            on now
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  )
+                })
+              )}
+            </ul>
+          </div>,
+          document.body,
+        )
+      : null
+
   return (
-    <div ref={wrapperRef} className="relative">
+    <>
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setOpen((o) => !o)}
         className="inline-flex h-7 max-w-[10rem] items-center gap-1 truncate rounded-md border border-zinc-200 bg-white px-2 text-[11px] font-medium text-zinc-800 hover:bg-zinc-50"
@@ -77,60 +183,8 @@ function GoalAutocomplete({ value, onChange, goals, activeBlockGoalId }: GoalAut
         <span className="truncate">{displayName}</span>
         <ChevronDown className="h-3 w-3 shrink-0 text-zinc-400" />
       </button>
-      {open && (
-        <div className="absolute bottom-full right-0 z-30 mb-1 w-56 overflow-hidden rounded-md border border-zinc-200 bg-white shadow-lg">
-          <div className="border-b border-zinc-100 p-1.5">
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape') {
-                  e.preventDefault()
-                  setOpen(false)
-                  setSearch('')
-                }
-              }}
-              placeholder="Search goals..."
-              autoFocus
-              className="h-7 w-full rounded border border-zinc-200 bg-white px-2 text-[11px] text-zinc-900 placeholder:text-zinc-400 focus:border-[#f2cc0d] focus:outline-none focus:ring-1 focus:ring-[#f2cc0d]"
-            />
-          </div>
-          <ul className="max-h-44 overflow-y-auto py-1">
-            {items.length === 0 ? (
-              <li className="px-2.5 py-1.5 text-[11px] text-zinc-400">No goals match</li>
-            ) : (
-              items.map((g) => {
-                const isOnNow = g.id !== NO_GOAL && g.id === activeBlockGoalId
-                const isSelected = g.id === value
-                return (
-                  <li key={g.id}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onChange(g.id)
-                        setOpen(false)
-                        setSearch('')
-                      }}
-                      className={`flex w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left text-[11px] transition-colors ${
-                        isSelected ? 'bg-[#fff7d1] text-zinc-900' : 'text-zinc-700 hover:bg-zinc-50'
-                      }`}
-                    >
-                      <span className="truncate">{g.title}</span>
-                      {isOnNow && (
-                        <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-700">
-                          on now
-                        </span>
-                      )}
-                    </button>
-                  </li>
-                )
-              })
-            )}
-          </ul>
-        </div>
-      )}
-    </div>
+      {panel}
+    </>
   )
 }
 
@@ -149,6 +203,9 @@ export function StartTrackingPopover({ open, onClose }: StartTrackingPopoverProp
   const [isCreating, setIsCreating] = useState(false)
   const [highlightedIndex, setHighlightedIndex] = useState(0)
   const taskListRef = useRef<HTMLUListElement | null>(null)
+  // The portalled goal-picker panel lives outside this popover in the DOM,
+  // so the parent's outside-click dismiss needs to treat it as "inside".
+  const goalPanelRef = useRef<HTMLDivElement | null>(null)
 
   const activeBlock = useMemo(() => {
     if (!weeklySchedule) return null
@@ -279,7 +336,10 @@ export function StartTrackingPopover({ open, onClose }: StartTrackingPopoverProp
     onClose()
   }
 
-  const dismissRef = useDismissable<HTMLDivElement>(open, onClose)
+  // The goal picker panel is rendered in a portal, so we have to tell the
+  // dismiss handler to ignore clicks landing inside it.
+  const ignoreRefs = useMemo(() => [goalPanelRef], [])
+  const dismissRef = useDismissable<HTMLDivElement>(open, onClose, ignoreRefs)
 
   if (!open) return null
 
@@ -440,6 +500,7 @@ export function StartTrackingPopover({ open, onClose }: StartTrackingPopoverProp
                   <GoalAutocomplete
                     value={selectedGoalId}
                     onChange={handleGoalChange}
+                    panelRef={goalPanelRef}
                     goals={goals ?? []}
                     activeBlockGoalId={suggestedGoalId}
                   />
