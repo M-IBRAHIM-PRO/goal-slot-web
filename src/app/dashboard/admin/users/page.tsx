@@ -478,7 +478,7 @@ export default function AdminUsersPage() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="overflow-hidden border border-zinc-200 bg-white shadow-sm"
+        className="border border-zinc-200 bg-white shadow-sm"
       >
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
@@ -490,8 +490,8 @@ export default function AdminUsersPage() {
             <p className="font-bold">No users found</p>
           </div>
         ) : (
-          <div className="overflow-visible">
-            <table className="w-full">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[960px]">
               <thead className="bg-black text-white">
                 <tr>
                   <th className="w-12 px-4 py-3">
@@ -636,7 +636,7 @@ export default function AdminUsersPage() {
                                 <MoreHorizontal className="h-4 w-4" />
                               </button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-56">
+                            <DropdownMenuContent align="end" collisionPadding={12} className="w-56">
                               <DropdownMenuItem onClick={() => openModal('details', user)}>
                                 <Eye className="mr-2 h-4 w-4" />
                                 View Details
@@ -722,9 +722,10 @@ export default function AdminUsersPage() {
                   }}
                   className="border border-zinc-200 bg-white px-2 py-1 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary"
                 >
+                  <option value={20}>20</option>
                   <option value={50}>50</option>
                   <option value={100}>100</option>
-                  <option value={250}>250</option>
+                  <option value={200}>200</option>
                   <option value={500}>500</option>
                 </select>
               </label>
