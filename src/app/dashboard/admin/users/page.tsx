@@ -411,7 +411,7 @@ export default function AdminUsersPage() {
   const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN'
 
   return (
-    <PageShell>
+    <PageShell className="max-w-none">
       <PageHeader
         eyebrow="Admin"
         title="User Management"
