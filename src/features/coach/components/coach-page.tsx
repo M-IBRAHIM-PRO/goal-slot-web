@@ -844,7 +844,7 @@ export function CoachPage() {
   ]
 
   return (
-    <PageShell>
+    <PageShell className="pb-28 md:pb-24">
       <PageHeader
         title="Coach"
         eyebrow="Insights"
