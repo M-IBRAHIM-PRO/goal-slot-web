@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { fetchTemplate, fetchTemplates, importTemplate } from './api'
+import { fetchTemplate, fetchTemplates, importTemplate, syncTemplate } from './api'
 import type { TemplateImportOptions } from './types'
 
 export const LIBRARY_QUERY_KEY = ['library', 'templates'] as const
@@ -32,6 +32,19 @@ export function useImportTemplate(id: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['goals'] })
       qc.invalidateQueries({ queryKey: ['schedule'] })
+      qc.invalidateQueries({ queryKey: ['tasks'] })
+      qc.invalidateQueries({ queryKey: ['time-tracker'] })
+    },
+  })
+}
+
+// Sync mutation pulls any newly-curated tasks for templates the user has
+// already imported. Only tasks are touched.
+export function useSyncTemplate(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => syncTemplate(id),
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['tasks'] })
       qc.invalidateQueries({ queryKey: ['time-tracker'] })
     },

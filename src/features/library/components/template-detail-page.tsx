@@ -3,11 +3,12 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 
-import { ArrowLeft, CalendarDays, CheckSquare, Flag, Loader2, Sparkles } from 'lucide-react'
+import { ArrowLeft, CalendarDays, CheckSquare, Flag, Loader2, RefreshCw, Sparkles } from 'lucide-react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { toast } from 'react-hot-toast'
 
-import { useTemplate } from '../hooks'
+import { useSyncTemplate, useTemplate } from '../hooks'
 import {
   CATEGORY_LABEL,
   type TemplateGoal,
@@ -104,6 +105,29 @@ interface TemplateDetailPageProps {
 export function TemplateDetailPage({ templateId }: TemplateDetailPageProps) {
   const { data: template, isLoading, error } = useTemplate(templateId)
   const [importOpen, setImportOpen] = useState(false)
+  const syncMutation = useSyncTemplate(templateId)
+
+  const handleSync = async () => {
+    try {
+      const result = await syncMutation.mutateAsync()
+      if (!result.matched) {
+        toast.error(
+          'Import this template first. The Sync button is for templates you have already imported.',
+        )
+        return
+      }
+      if (result.tasksAdded === 0) {
+        toast.success('Already up to date. No new tasks.')
+        return
+      }
+      const noun = result.tasksAdded === 1 ? 'task' : 'tasks'
+      toast.success(
+        `Added ${result.tasksAdded} new ${noun}${result.skipped ? `, skipped ${result.skipped}` : ''}`,
+      )
+    } catch {
+      toast.error('Sync failed. Please try again.')
+    }
+  }
 
   const blocksByDay = useMemo(() => {
     const map = new Map<number, TemplateScheduleBlock[]>()
@@ -199,6 +223,20 @@ export function TemplateDetailPage({ templateId }: TemplateDetailPageProps) {
             className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-[#f2cc0d] px-4 text-sm font-bold text-zinc-900 shadow-sm hover:bg-[#dfb90c]"
           >
             Import to my account
+          </button>
+          <button
+            type="button"
+            onClick={handleSync}
+            disabled={syncMutation.isPending}
+            title={`Pull any new tasks the ${template.source} team has added to this template`}
+            className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-800 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {syncMutation.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <RefreshCw className="h-3.5 w-3.5" />
+            )}
+            Sync from {template.source}
           </button>
           <div className="flex flex-wrap gap-3 text-[11px] text-zinc-500">
             <span className="inline-flex items-center gap-1">

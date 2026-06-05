@@ -30,6 +30,14 @@ export interface TemplateTask {
   title: string
   description?: string
   category?: string
+  key?: string
+}
+
+export interface TemplateSyncResult {
+  templateId: string
+  tasksAdded: number
+  skipped: number
+  matched: boolean
 }
 
 export interface TemplateSummary {

@@ -5,6 +5,7 @@ import type {
   TemplateImportOptions,
   TemplateImportResult,
   TemplateSummary,
+  TemplateSyncResult,
 } from './types'
 
 export async function fetchTemplates(): Promise<TemplateSummary[]> {
@@ -25,5 +26,10 @@ export async function importTemplate(
     `/templates/${id}/import`,
     options,
   )
+  return data
+}
+
+export async function syncTemplate(id: string): Promise<TemplateSyncResult> {
+  const { data } = await api.post<TemplateSyncResult>(`/templates/${id}/sync`)
   return data
 }
