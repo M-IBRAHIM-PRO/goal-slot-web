@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 
 import {
   BarChart3,
+  BookOpen,
   Calendar,
   CheckSquare,
   Clock,
@@ -65,6 +66,7 @@ const navItems = [
   { href: '/dashboard/reports', label: 'Reports', icon: BarChart3 },
   { href: '/dashboard/reports/export', label: 'Export Reports', icon: Download },
   { href: '/dashboard/sharing', label: 'Sharing', icon: Share2 },
+  { href: '/dashboard/library', label: 'Library', icon: BookOpen },
 ]
 
 const adminNavItems = [
