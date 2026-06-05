@@ -260,6 +260,10 @@ export interface GoogleCalendarConnectionDto {
   scopes?: string[]
   // Calendars the user has already chosen, used to prefill the picker.
   selections?: CalendarSelectionInput[]
+  // PR2 push: when true, GoalSlot blocks are mirrored to a dedicated "GoalSlot"
+  // calendar on the user's account. Independent of the per-calendar read
+  // `selections` above.
+  pushEnabled?: boolean
 }
 
 export interface GoogleCalendarDto {
@@ -287,6 +291,7 @@ export const calendarApi = {
   saveSelections: (selections: CalendarSelectionInput[]) =>
     api.put('/integrations/google/selections', { selections }),
   sync: () => api.post('/integrations/google/sync'),
+  setPush: (pushEnabled: boolean) => api.patch('/integrations/google', { pushEnabled }),
   disconnect: () => api.delete('/integrations/google'),
   getEvents: (from: string, to: string) =>
     api.get<ExternalEventDto[]>('/integrations/google/events', { params: { from, to } }),

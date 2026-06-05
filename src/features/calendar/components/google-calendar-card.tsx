@@ -7,18 +7,31 @@ import { useGoogleCalendar } from '@/features/calendar/hooks/use-google-calendar
 import { AlertTriangle, CalendarDays, RefreshCw, Trash2 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { SectionHeader } from '@/components/ui/section-header'
+import { Switch } from '@/components/ui/switch'
 
 export function GoogleCalendarCard() {
-  const { connection, connect, sync, disconnect } = useGoogleCalendar()
+  const { connection, connect, sync, disconnect, setPush } = useGoogleCalendar()
   const [showPicker, setShowPicker] = useState(false)
+  const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false)
 
   const data = connection.data
   const isConnected = data?.connected ?? false
   const isStale = data?.status === 'stale'
+  const pushEnabled = data?.pushEnabled ?? false
+
+  const handleTogglePush = async (enabled: boolean) => {
+    try {
+      await setPush.mutateAsync(enabled)
+      toast.success(enabled ? 'Pushing GoalSlot blocks to Google' : 'Stopped pushing to Google')
+    } catch {
+      toast.error('Could not update push setting')
+    }
+  }
 
   const handleConnect = async () => {
     try {
@@ -39,11 +52,6 @@ export function GoogleCalendarCard() {
   }
 
   const handleDisconnect = async () => {
-    const ok =
-      typeof window !== 'undefined'
-        ? window.confirm('Disconnect Google Calendar? Imported events will be removed from your schedule.')
-        : true
-    if (!ok) return
     try {
       await disconnect.mutateAsync()
       toast.success('Google Calendar disconnected')
@@ -73,8 +81,8 @@ export function GoogleCalendarCard() {
       />
 
       <p className="mb-4 text-sm text-zinc-600">
-        See your Google Calendar events alongside your GoalSlot schedule. We ask for read and write
-        access because a later update will also push your GoalSlot blocks back to Google.
+        See your Google Calendar events alongside your GoalSlot schedule, and push your GoalSlot
+        blocks back to Google. We ask for read and write access for both directions.
       </p>
 
       {/* Unverified-app callout — shipping v1 before Google verification. */}
@@ -101,6 +109,19 @@ export function GoogleCalendarCard() {
               <span className="truncate text-sm text-zinc-700">{data.accountEmail}</span>
             </div>
           )}
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 px-3 py-2.5">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-zinc-800">Push GoalSlot blocks to Google</p>
+              <p className="text-[12px] text-zinc-500">
+                Mirror your schedule to a dedicated &ldquo;GoalSlot&rdquo; calendar on your account.
+              </p>
+            </div>
+            <Switch
+              checked={pushEnabled}
+              onCheckedChange={handleTogglePush}
+              disabled={setPush.isPending}
+            />
+          </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="brand" size="sm" onClick={() => setShowPicker(true)}>
               <CalendarDays className="h-3.5 w-3.5" />
@@ -113,7 +134,7 @@ export function GoogleCalendarCard() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={handleDisconnect}
+              onClick={() => setShowDisconnectConfirm(true)}
               disabled={disconnect.isPending}
               className="text-rose-600 hover:text-rose-700"
             >
@@ -129,6 +150,17 @@ export function GoogleCalendarCard() {
       )}
 
       <CalendarPickerDialog open={showPicker} onOpenChange={setShowPicker} connection={data} />
+
+      <ConfirmDialog
+        open={showDisconnectConfirm}
+        onOpenChange={setShowDisconnectConfirm}
+        title="Disconnect Google Calendar"
+        description="Imported events will be removed from your schedule and GoalSlot will stop pushing your blocks to Google."
+        confirmButtonText="Disconnect"
+        variant="destructive"
+        isLoading={disconnect.isPending}
+        onConfirm={handleDisconnect}
+      />
     </GlassCard>
   )
 }

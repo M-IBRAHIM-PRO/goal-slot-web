@@ -31,12 +31,10 @@ import {
 
 type PickerState = Record<string, { checked: boolean; direction: CalendarSyncDirection }>
 
-// Direction copy. "out"/"both" land in PR2 (push); PR1 only acts on the
-// inbound half, but we keep the full set so selections persist across PRs.
 const DIRECTIONS: { value: CalendarSyncDirection; label: string }[] = [
   { value: 'in', label: 'Show in GoalSlot' },
-  { value: 'both', label: 'Two-way (push in PR2)' },
-  { value: 'out', label: 'Push only (PR2)' },
+  { value: 'both', label: 'Two-way' },
+  { value: 'out', label: 'Push only' },
 ]
 
 export function CalendarPickerDialog({
@@ -90,8 +88,8 @@ export function CalendarPickerDialog({
         <DialogHeader>
           <DialogTitle>Manage calendars</DialogTitle>
           <DialogDescription>
-            Pick which Google calendars appear on your schedule. Read-only for now; pushing GoalSlot
-            blocks back to Google arrives in a later update.
+            Pick which Google calendars appear on your schedule, and set the sync direction for
+            each.
           </DialogDescription>
         </DialogHeader>
 

@@ -30,12 +30,17 @@ export function useGoogleCalendar() {
     onSuccess: invalidateAll,
   })
 
+  const setPush = useMutation({
+    mutationFn: (enabled: boolean) => calendarApi.setPush(enabled),
+    onSuccess: invalidateAll,
+  })
+
   const saveSelections = useMutation({
     mutationFn: (selections: CalendarSelectionInput[]) => calendarApi.saveSelections(selections),
     onSuccess: invalidateAll,
   })
 
-  return { connection, connect, sync, disconnect, saveSelections }
+  return { connection, connect, sync, disconnect, saveSelections, setPush }
 }
 
 // Lazily fetched only when the picker opens (enabled), so we don't hit Google
