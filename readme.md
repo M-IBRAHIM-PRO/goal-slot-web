@@ -73,7 +73,7 @@ App at http://localhost:3010.
 ┌─────────────────┐       HTTP (REST + JWT)         ┌─────────────────────────┐
 │  goal-slot-web  │ ──────────────────────────────► │      goal-slot-api      │
 │  (this repo)    │   NEXT_PUBLIC_API_URL           │    (NestJS + Prisma)    │
-│   Next.js 16    │   default: api.goalslot.io      │  Postgres via Supabase  │
+│   Next.js 16    │   default: api.goalslot.io      │    Postgres via Neon    │
 └─────────────────┘                                 └─────────────────────────┘
 ```
 
